@@ -12,7 +12,12 @@ const spaceMono = Space_Mono({
 export const metadata = {
   title: "Shader Customizer",
   description: "Interactive GLSL shader playground",
-    generator: 'v0.app'
+  icons: {
+    icon: [
+      { url: "/icon-light.png", type: "image/png", media: "(prefers-color-scheme: light)" },
+      { url: "/icon-dark.png", type: "image/png", media: "(prefers-color-scheme: dark)" },
+    ],
+  },
 }
 
 export default function RootLayout({
