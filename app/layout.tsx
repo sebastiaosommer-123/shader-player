@@ -10,7 +10,7 @@ const spaceMono = Space_Mono({
 })
 
 export const metadata = {
-  title: "Shader Customizer",
+  title: "Shader Playground",
   description: "Interactive GLSL shader playground",
   icons: {
     icon: [
