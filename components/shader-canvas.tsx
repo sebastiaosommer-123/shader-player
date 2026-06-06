@@ -7,19 +7,25 @@ import { initShader, updateUniforms } from "@/lib/shader-renderer"
 interface ShaderCanvasProps {
   params: ShaderParams
   shaderId: string
+  isPaused?: boolean
 }
 
 export interface ShaderCanvasRef {
   getCanvas: () => HTMLCanvasElement | null
 }
 
-export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ params, shaderId }, ref) => {
+export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ params, shaderId, isPaused = false }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<WebGLRenderingContext | null>(null)
   const programRef = useRef<WebGLProgram | null>(null)
   const animationRef = useRef<number>()
   const paramsRef = useRef<ShaderParams>(params)
   const shaderIdRef = useRef<string>(shaderId)
+  const isPausedRef = useRef(isPaused)
+  const pausedAtRef = useRef<number | null>(null)
+  const totalPausedTimeRef = useRef(0)
+  const renderFnRef = useRef<(() => void) | null>(null)
+  const isLoopRunningRef = useRef(false)
 
   useImperativeHandle(ref, () => ({
     getCanvas: () => canvasRef.current,
@@ -28,6 +34,24 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
   useEffect(() => {
     paramsRef.current = params
   }, [params])
+
+  useEffect(() => {
+    const wasPaused = isPausedRef.current
+    isPausedRef.current = isPaused
+
+    if (isPaused && !wasPaused) {
+      pausedAtRef.current = Date.now()
+    } else if (!isPaused && wasPaused) {
+      if (pausedAtRef.current !== null) {
+        totalPausedTimeRef.current += Date.now() - pausedAtRef.current
+        pausedAtRef.current = null
+      }
+      if (!isLoopRunningRef.current && renderFnRef.current) {
+        isLoopRunningRef.current = true
+        renderFnRef.current()
+      }
+    }
+  }, [isPaused])
 
   useEffect(() => {
     if (shaderIdRef.current !== shaderId && glRef.current) {
@@ -77,9 +101,12 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
     const startTime = Date.now()
 
     const render = () => {
-      if (!gl || !programRef.current) return
+      if (!gl || !programRef.current || isPausedRef.current) {
+        isLoopRunningRef.current = false
+        return
+      }
 
-      const time = (Date.now() - startTime) / 1000
+      const time = (Date.now() - startTime - totalPausedTimeRef.current) / 1000
       updateUniforms(gl, programRef.current, paramsRef.current, time, canvas.width, canvas.height, shaderIdRef.current)
 
       gl.clearColor(0, 0, 0, 1)
@@ -89,6 +116,8 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
       animationRef.current = requestAnimationFrame(render)
     }
 
+    renderFnRef.current = render
+    isLoopRunningRef.current = true
     render()
 
     return () => {

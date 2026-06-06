@@ -101,7 +101,7 @@ export default function Home() {
     <div className="h-screen w-screen overflow-hidden">
       {/* Shader Canvas — full viewport */}
       <div className="fixed inset-0">
-        <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} />
+        <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} isPaused={isGalleryOpen} />
       </div>
 
       <FloatingControlsPanel
