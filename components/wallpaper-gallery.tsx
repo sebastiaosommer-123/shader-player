@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { flushSync } from "react-dom"
 import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { CapturedImage } from "@/lib/types"
@@ -55,6 +56,10 @@ export function WallpaperGallery({
   const [isBurnReady, setIsBurnReady] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
 
+  const [slideX, setSlideX] = useState(0)
+  const [slideTransition, setSlideTransition] = useState(true)
+  const isNavigatingRef = useRef(false)
+
   const storedOriginRect = useRef<DOMRect | null>(null)
   const prefersReducedMotion =
     typeof window !== "undefined" &&
@@ -70,6 +75,9 @@ export function WallpaperGallery({
     if (isOpen) {
       setCurrentIndex(initialIndex)
       setShouldRender(true)
+      setSlideX(0)
+      setSlideTransition(true)
+      isNavigatingRef.current = false
       const timeout = setTimeout(() => {
         setIsVisible(true)
         setImageVisible(true)
@@ -93,8 +101,10 @@ export function WallpaperGallery({
   }, [reversedImages.length, currentIndex, onClose])
 
   useEffect(() => {
-    if (shouldRender) {
+    if (shouldRender && !isNavigatingRef.current) {
       setImageVisible(true)
+      setSlideX(0)
+      setSlideTransition(true)
       setIsDeleting(false)
       setIsBurnReady(false)
       setIsScanning(false)
@@ -108,17 +118,57 @@ export function WallpaperGallery({
 
   const handlePrevious = () => {
     playDigitalClick("strong")
+    if (prefersReducedMotion) {
+      setImageVisible(false)
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reversedImages.length - 1))
+      }, 150)
+      return
+    }
+    isNavigatingRef.current = true
+    setSlideTransition(true)
+    setSlideX(30)
     setImageVisible(false)
     setTimeout(() => {
-      setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reversedImages.length - 1))
+      flushSync(() => {
+        setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reversedImages.length - 1))
+        setSlideTransition(false)
+        setSlideX(-30)
+      })
+      setTimeout(() => {
+        setSlideTransition(true)
+        setSlideX(0)
+        setImageVisible(true)
+        setTimeout(() => { isNavigatingRef.current = false }, 250)
+      }, 16)
     }, 150)
   }
 
   const handleNext = () => {
     playDigitalClick("strong")
+    if (prefersReducedMotion) {
+      setImageVisible(false)
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev < reversedImages.length - 1 ? prev + 1 : 0))
+      }, 150)
+      return
+    }
+    isNavigatingRef.current = true
+    setSlideTransition(true)
+    setSlideX(-30)
     setImageVisible(false)
     setTimeout(() => {
-      setCurrentIndex((prev) => (prev < reversedImages.length - 1 ? prev + 1 : 0))
+      flushSync(() => {
+        setCurrentIndex((prev) => (prev < reversedImages.length - 1 ? prev + 1 : 0))
+        setSlideTransition(false)
+        setSlideX(30)
+      })
+      setTimeout(() => {
+        setSlideTransition(true)
+        setSlideX(0)
+        setImageVisible(true)
+        setTimeout(() => { isNavigatingRef.current = false }, 250)
+      }, 16)
     }, 150)
   }
 
@@ -225,16 +275,23 @@ export function WallpaperGallery({
         onClick={handleClose}
       >
         {/* Image Display */}
-        <div className="w-screen h-screen relative flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+        <div className="w-screen h-screen relative flex items-center justify-center overflow-hidden" onClick={(e) => e.stopPropagation()}>
           {currentImage && (
             <img
               src={currentImage.dataUrl || "/placeholder.svg"}
               alt={`Captured frame ${currentIndex + 1}`}
-              className={`w-full h-full object-contain absolute inset-0 ${
-                isBurnReady
-                  ? "opacity-0"
-                  : `transition-opacity duration-150 ease-in-out ${imageVisible ? "opacity-100" : "opacity-0"}`
-              }`}
+              className="w-full h-full object-contain absolute inset-0"
+              style={
+                prefersReducedMotion
+                  ? { opacity: imageVisible ? 1 : 0, transition: "opacity 150ms ease-in-out" }
+                  : {
+                      opacity: isBurnReady ? 0 : imageVisible ? 1 : 0,
+                      transform: `translateX(${slideX}px)`,
+                      transition: slideTransition
+                        ? "transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out"
+                        : "none",
+                    }
+              }
             />
           )}
 
