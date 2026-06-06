@@ -26,7 +26,7 @@ export function MobileNav({ onCapture, params, setParams, shaderId, onShaderChan
             playDigitalClick("strong")
             setSheetOpen(true)
           }}
-          className="flex-1 text-white px-5 border border-white/10 flex items-center gap-2 font-mono text-sm transition-all duration-300 whitespace-nowrap justify-between rounded-full hover:bg-zinc-800 active:scale-[0.97] bg-background h-11 pr-4"
+          className="flex-1 text-white px-5 border border-white/10 flex items-center gap-2 font-mono text-sm transition-[opacity,transform] duration-300 whitespace-nowrap justify-between rounded-full hoverFine:bg-zinc-800 active:scale-[0.97] bg-background h-11 pr-4"
           style={{
             opacity: sheetOpen ? 0 : 1,
             transform: sheetOpen ? "scale(0.9)" : "scale(1)",
@@ -44,7 +44,7 @@ export function MobileNav({ onCapture, params, setParams, shaderId, onShaderChan
             playDigitalClick("strong")
             onCapture()
           }}
-          className="flex items-center justify-center rounded-full hover:bg-zinc-800 text-white transition-[background,transform] duration-150  active:scale-[0.97] border border-white/10 bg-background size-11"
+          className="flex items-center justify-center rounded-full hoverFine:bg-zinc-800 text-white transition-[background,transform] duration-150 active:scale-[0.97] border border-white/10 bg-background size-11"
           aria-label="Capture frame"
           style={{
             opacity: sheetOpen ? 0 : 1,

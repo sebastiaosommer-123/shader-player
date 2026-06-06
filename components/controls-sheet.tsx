@@ -30,7 +30,9 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId,
         className="fixed bottom-0 left-0 right-0 z-50 bg-black text-white rounded-t-2xl border-t border-white/10 h-[400px] sm:h-[80vh] transition-transform duration-[300ms]"
         style={{
           transform: open ? "translateY(0)" : "translateY(100%)",
-          transitionTimingFunction: "cubic-bezier(0.0, 0.0, 0.2, 1)",
+          transitionTimingFunction: open
+            ? "cubic-bezier(0.0, 0.0, 0.2, 1)"
+            : "cubic-bezier(0.4, 0.0, 1, 1)",
         }}
       >
         <button

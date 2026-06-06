@@ -233,7 +233,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 [data-slot="dialog-content"][data-state="closed"] {
-  animation: dialog-fade-out 200ms ease-in forwards;
+  animation: dialog-fade-out 150ms ease-out forwards;
 }
 
 [data-slot="dialog-overlay"][data-state="open"] {
@@ -241,7 +241,18 @@ input[type="range"]::-moz-range-thumb {
 }
 
 [data-slot="dialog-overlay"][data-state="closed"] {
-  animation: overlay-fade-out 200ms ease-in;
+  animation: overlay-fade-out 150ms ease-out;
+}
+
+@custom-variant hoverFine (@media (hover: hover) and (pointer: fine));
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="dialog-content"],
+  [data-slot="dialog-overlay"] {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 /* Prevent scrolling on mobile devices */
