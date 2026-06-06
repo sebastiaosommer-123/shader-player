@@ -202,128 +202,146 @@ export function WallpaperGallery({
           transition: "opacity 150ms ease-in-out",
         }
 
+  const uiOverlayStyle: React.CSSProperties = !prefersReducedMotion
+    ? {
+        opacity: isVisible ? 1 : 0,
+        filter: isVisible ? "blur(0px)" : "blur(6px)",
+        transition: isVisible
+          ? "opacity 180ms cubic-bezier(0.23, 1, 0.32, 1), filter 180ms cubic-bezier(0.23, 1, 0.32, 1)"
+          : "opacity 140ms cubic-bezier(0.23, 1, 0.32, 1), filter 140ms cubic-bezier(0.23, 1, 0.32, 1)",
+        transitionDelay: isVisible ? "320ms" : "0ms",
+      }
+    : {
+        opacity: isVisible ? 1 : 0,
+        transition: "opacity 150ms ease",
+      }
+
   return (
-    <div
-      className="fixed inset-0 bg-background/20 backdrop-blur-xl z-50 flex items-center justify-center"
-      style={animationStyle}
-      onClick={handleClose}
-    >
-      {/* Close Button */}
-      {displayCount > 0 && (
-        <Button
-          onClick={(e) => {
-            e.stopPropagation()
-            handleClose()
-          }}
-          variant="ghost"
-          size="icon"
-          className="absolute top-4 right-4 z-50 cursor-pointer rounded-full bg-black/40 border border-white/20 hover:bg-black/20 size-11 transition-[background,transform] duration-150 active:scale-[0.97]"
-          aria-label="Close gallery"
-        >
-          <X className="h-6 w-6" />
-        </Button>
-      )}
+    <div className="fixed inset-0 z-50">
+      {/* Layer 1: backdrop + image — thumbnail expansion animation */}
+      <div
+        className="fixed inset-0 bg-background/20 backdrop-blur-xl flex items-center justify-center"
+        style={animationStyle}
+        onClick={handleClose}
+      >
+        {/* Image Display */}
+        <div className="w-screen h-screen relative flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          {currentImage && (
+            <img
+              src={currentImage.dataUrl || "/placeholder.svg"}
+              alt={`Captured frame ${currentIndex + 1}`}
+              className={`w-full h-full object-contain transition-opacity duration-150 ease-in-out absolute inset-0 ${
+                imageVisible && !isBurnReady ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          )}
 
-      {/* Only render controls and image if we have a current image */}
-      {currentImage && (
-        <>
-          {/* Image Counter */}
-          {displayCount > 0 && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 rounded-full font-medium bg-[rgba(10,10,10,0.2717391304347826)] px-3 py-1.5 text-sm">
-              {displayIndex + 1} / {displayCount}
+          {isDeleting && currentImage && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <BurningImage src={currentImage.dataUrl} onComplete={handleBurnComplete} onReady={handleBurnReady} />
             </div>
           )}
 
-          {/* Navigation Arrows */}
-          {reversedImages.length > 1 && (
-            <>
-              {currentIndex > 0 && (
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handlePrevious()
-                  }}
-                  variant="ghost"
-                  size="icon"
-                  className="absolute left-4 z-50 cursor-pointer h-12 w-12 rounded-full bg-black/40 border border-white/20 hover:bg-black/20 transition-[background,transform] duration-150 active:scale-[0.97]"
-                  aria-label="Previous image"
-                >
-                  <ChevronLeft className="h-8 w-8" />
-                </Button>
-              )}
-
-              {currentIndex < reversedImages.length - 1 && (
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleNext()
-                  }}
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-4 z-50 cursor-pointer rounded-full bg-black/40 border border-white/20 hover:bg-black/20 w-11 h-11 transition-[background,transform] duration-150 active:scale-[0.97]"
-                  aria-label="Next image"
-                >
-                  <ChevronRight className="h-8 w-8" />
-                </Button>
-              )}
-            </>
-          )}
-
-          {/* Action Buttons */}
-          {displayCount > 0 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 flex gap-2">
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDelete()
-                }}
-                className="cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-[rgba(202,82,82,1)] h-11 text-sm hover:bg-[rgba(202,82,82,1)] hover:brightness-110 active:scale-[0.97] transition-[background,transform] duration-150 font-medium"
-              >
-                <Trash2 className="h-5 w-5" />
-                Delete
-              </Button>
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDownload()
-                }}
-                className="cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-background h-11 text-sm hover:bg-zinc-800 active:scale-[0.97] transition-[background,transform] duration-150 font-medium"
-                style={{
-                  WebkitTapHighlightColor: "transparent",
-                  touchAction: "manipulation",
-                  transform: "translate3d(0,0,0)",
-                }}
-              >
-                <Download className="h-5 w-5" />
-                Download
-              </Button>
+          {isScanning && currentImage && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <ScanLineOverlay src={currentImage.dataUrl} onComplete={handleScanComplete} />
             </div>
           )}
-        </>
-      )}
+        </div>
+      </div>
 
-      {/* Image Display */}
-      <div className="w-screen h-screen relative flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+      {/* Layer 2: UI controls — blur-fade only, independent of image scale */}
+      <div className="fixed inset-0 pointer-events-none" style={uiOverlayStyle}>
+        {/* Close Button */}
+        {displayCount > 0 && (
+          <Button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleClose()
+            }}
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 pointer-events-auto cursor-pointer rounded-full bg-black/40 border border-white/20 hover:bg-black/20 size-11 transition-[background,transform] duration-150 active:scale-[0.97]"
+            aria-label="Close gallery"
+          >
+            <X className="h-6 w-6" />
+          </Button>
+        )}
+
         {currentImage && (
-          <img
-            src={currentImage.dataUrl || "/placeholder.svg"}
-            alt={`Captured frame ${currentIndex + 1}`}
-            className={`w-full h-full object-contain transition-opacity duration-150 ease-in-out absolute inset-0 ${
-              imageVisible && !isBurnReady ? "opacity-100" : "opacity-0"
-            }`}
-          />
-        )}
+          <>
+            {/* Image Counter */}
+            {displayCount > 0 && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full font-medium bg-[rgba(10,10,10,0.2717391304347826)] px-3 py-1.5 text-sm">
+                {displayIndex + 1} / {displayCount}
+              </div>
+            )}
 
-        {isDeleting && currentImage && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <BurningImage src={currentImage.dataUrl} onComplete={handleBurnComplete} onReady={handleBurnReady} />
-          </div>
-        )}
+            {/* Navigation Arrows */}
+            {reversedImages.length > 1 && (
+              <>
+                {currentIndex > 0 && (
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handlePrevious()
+                    }}
+                    variant="ghost"
+                    size="icon"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer h-12 w-12 rounded-full bg-black/40 border border-white/20 hover:bg-black/20 transition-[background,transform] duration-150 active:scale-[0.97]"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="h-8 w-8" />
+                  </Button>
+                )}
 
-        {isScanning && currentImage && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <ScanLineOverlay src={currentImage.dataUrl} onComplete={handleScanComplete} />
-          </div>
+                {currentIndex < reversedImages.length - 1 && (
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleNext()
+                    }}
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer rounded-full bg-black/40 border border-white/20 hover:bg-black/20 w-11 h-11 transition-[background,transform] duration-150 active:scale-[0.97]"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="h-8 w-8" />
+                  </Button>
+                )}
+              </>
+            )}
+
+            {/* Action Buttons */}
+            {displayCount > 0 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDelete()
+                  }}
+                  className="pointer-events-auto cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-[rgba(202,82,82,1)] h-11 text-sm hover:bg-[rgba(202,82,82,1)] hover:brightness-110 active:scale-[0.97] transition-[background,transform] duration-150 font-medium"
+                >
+                  <Trash2 className="h-5 w-5" />
+                  Delete
+                </Button>
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDownload()
+                  }}
+                  className="pointer-events-auto cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-background h-11 text-sm hover:bg-zinc-800 active:scale-[0.97] transition-[background,transform] duration-150 font-medium"
+                  style={{
+                    WebkitTapHighlightColor: "transparent",
+                    touchAction: "manipulation",
+                  }}
+                >
+                  <Download className="h-5 w-5" />
+                  Download
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
