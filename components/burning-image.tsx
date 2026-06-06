@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { playBurnSound } from "@/lib/burn-audio"
 
 interface BurningImageProps {
@@ -13,6 +13,7 @@ export function BurningImage({ src, onComplete, onReady }: BurningImageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const requestRef = useRef<number>()
   const startTimeRef = useRef<number>()
+  const [canvasVisible, setCanvasVisible] = useState(false)
 
   useEffect(() => {
     const stopSound = playBurnSound()
@@ -25,10 +26,6 @@ export function BurningImage({ src, onComplete, onReady }: BurningImageProps) {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const gl = canvas.getContext("webgl")
-    if (!gl) return
-
-    // Vertex shader
     const vsSource = `
       attribute vec2 position;
       varying vec2 vUv;
@@ -40,7 +37,6 @@ export function BurningImage({ src, onComplete, onReady }: BurningImageProps) {
       }
     `
 
-    // Fragment shader
     const fsSource = `
       precision mediump float;
       varying vec2 vUv;
@@ -72,44 +68,44 @@ export function BurningImage({ src, onComplete, onReady }: BurningImageProps) {
 
       void main() {
         vec4 texColor = texture2D(u_texture, vUv);
-        
+
         // Create flame noise
         // We stretch it vertically to look like rising flames
         float n = fbm(vec2(vUv.x * 10.0, vUv.y * 10.0 - u_time * 3.0));
-        
+
         // Calculate the burn frontier
         // u_progress goes 0 -> 1. We map it to cover the whole height plus buffers
         // We invert the direction so it burns from bottom (1.0 in UV because we flipped it) to top
-        // Wait, in VS we did vUv.y = 1.0 - vUv.y. 
+        // Wait, in VS we did vUv.y = 1.0 - vUv.y.
         // So vUv.y=0 is top, vUv.y=1 is bottom.
         // We want to burn from bottom (1.0) to top (0.0).
-        
+
         float frontier = 1.0 - (u_progress * 1.4 - 0.2);
-        
+
         // Add noise to the frontier
         float dist = vUv.y - frontier + n * 0.15;
-        
+
         // If we are below the fire line (remember Y is inverted, so "below" means > frontier)
         if (dist > 0.0) {
            discard;
         }
-        
+
         // Fire edge
         // We want a band of fire right at the edge
         if (dist > -0.15) {
            float t = (dist + 0.15) / 0.15; // 0 to 1
-           
+
            // Fire palette
            vec3 color1 = vec3(1.0, 0.2, 0.0); // Red/Orange
            vec3 color2 = vec3(1.0, 0.9, 0.1); // Yellow
            vec3 color3 = vec3(1.0, 1.0, 1.0); // White hot
-           
+
            vec3 fireColor = mix(color1, color2, t * 2.0);
            if (t > 0.5) fireColor = mix(color2, color3, (t - 0.5) * 2.0);
-           
+
            // Add some sparkle/noise to the fire
            fireColor += vec3(0.2) * noise(vec2(vUv.x * 20.0, u_time * 10.0));
-           
+
            // Blend with original image color to make it look like it's glowing before vanishing
            gl_FragColor = vec4(mix(texColor.rgb, fireColor, 0.8), 1.0);
         } else {
@@ -118,113 +114,115 @@ export function BurningImage({ src, onComplete, onReady }: BurningImageProps) {
       }
     `
 
-    // Shader setup helper
-    function createShader(gl: WebGLRenderingContext, type: number, source: string) {
-      const shader = gl.createShader(type)
-      if (!shader) return null
-      gl.shaderSource(shader, source)
-      gl.compileShader(shader)
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error(gl.getShaderInfoLog(shader))
-        gl.deleteShader(shader)
-        return null
-      }
-      return shader
-    }
-
-    const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource)
-    const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource)
-    
-    if (!vertexShader || !fragmentShader) return
-
-    const program = gl.createProgram()
-    if (!program) return
-    
-    gl.attachShader(program, vertexShader)
-    gl.attachShader(program, fragmentShader)
-    gl.linkProgram(program)
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error(gl.getProgramInfoLog(program))
-      return
-    }
-
-    gl.useProgram(program)
-
-    // Buffer setup
-    const positionBuffer = gl.createBuffer()
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      -1.0, -1.0,
-       1.0, -1.0,
-      -1.0,  1.0,
-      -1.0,  1.0,
-       1.0, -1.0,
-       1.0,  1.0,
-    ]), gl.STATIC_DRAW)
-
-    const positionLocation = gl.getAttribLocation(program, "position")
-    gl.enableVertexAttribArray(positionLocation)
-    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0)
-
-    // Texture setup
-    const texture = gl.createTexture()
-    gl.bindTexture(gl.TEXTURE_2D, texture)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-
-    // Load image
+    // Load the image first so we can size the canvas before creating the WebGL context.
+    // Resizing the canvas after WebGL init resets vertex attribute state, causing a black frame.
     const image = new Image()
     image.src = src
     image.onload = () => {
       canvas.width = image.width
       canvas.height = image.height
+
+      const gl = canvas.getContext("webgl")
+      if (!gl) return
+
+      function createShader(gl: WebGLRenderingContext, type: number, source: string) {
+        const shader = gl.createShader(type)
+        if (!shader) return null
+        gl.shaderSource(shader, source)
+        gl.compileShader(shader)
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          console.error(gl.getShaderInfoLog(shader))
+          gl.deleteShader(shader)
+          return null
+        }
+        return shader
+      }
+
+      const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource)
+      const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource)
+      if (!vertexShader || !fragmentShader) return
+
+      const program = gl.createProgram()
+      if (!program) return
+
+      gl.attachShader(program, vertexShader)
+      gl.attachShader(program, fragmentShader)
+      gl.linkProgram(program)
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program))
+        return
+      }
+
+      gl.useProgram(program)
       gl.viewport(0, 0, canvas.width, canvas.height)
 
+      const positionBuffer = gl.createBuffer()
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1.0, -1.0,
+         1.0, -1.0,
+        -1.0,  1.0,
+        -1.0,  1.0,
+         1.0, -1.0,
+         1.0,  1.0,
+      ]), gl.STATIC_DRAW)
+
+      const positionLocation = gl.getAttribLocation(program, "position")
+      gl.enableVertexAttribArray(positionLocation)
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0)
+
+      const texture = gl.createTexture()
       gl.bindTexture(gl.TEXTURE_2D, texture)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
-      
-      // Start animation loop
-      startTimeRef.current = performance.now()
-      requestRef.current = requestAnimationFrame(animate)
 
-      if (onReady) onReady()
-    }
+      const uTime = gl.getUniformLocation(program, "u_time")
+      const uProgress = gl.getUniformLocation(program, "u_progress")
 
-    const uTime = gl.getUniformLocation(program, "u_time")
-    const uProgress = gl.getUniformLocation(program, "u_progress")
+      const DURATION = 1500
 
-    const DURATION = 1500 // 1.5 seconds for the burn
+      function animate(time: number) {
+        if (!startTimeRef.current) startTimeRef.current = time
+        const elapsed = time - startTimeRef.current
+        const progress = Math.min(elapsed / DURATION, 1.0)
 
-    function animate(time: number) {
-      if (!startTimeRef.current) startTimeRef.current = time
-      const elapsed = time - startTimeRef.current
-      const progress = Math.min(elapsed / DURATION, 1.0)
+        gl.uniform1f(uTime, time * 0.001)
+        gl.uniform1f(uProgress, progress)
+        gl.drawArrays(gl.TRIANGLES, 0, 6)
 
-      gl.uniform1f(uTime, time * 0.001)
-      gl.uniform1f(uProgress, progress)
-
-      gl.drawArrays(gl.TRIANGLES, 0, 6)
-
-      if (progress < 1.0) {
-        requestRef.current = requestAnimationFrame(animate)
-      } else {
-        onComplete()
+        if (progress < 1.0) {
+          requestRef.current = requestAnimationFrame(animate)
+        } else {
+          onComplete()
+        }
       }
+
+      // Render first frame invisibly, then atomically reveal canvas and hide the <img>.
+      requestRef.current = requestAnimationFrame((time) => {
+        startTimeRef.current = time
+        gl.uniform1f(uTime, time * 0.001)
+        gl.uniform1f(uProgress, 0)
+        gl.drawArrays(gl.TRIANGLES, 0, 6)
+
+        setCanvasVisible(true)
+        if (onReady) onReady()
+
+        requestRef.current = requestAnimationFrame(animate)
+      })
     }
 
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current)
-      // Cleanup WebGL resources if needed
     }
   }, [src, onComplete, onReady])
 
   return (
-    <canvas 
-      ref={canvasRef} 
-      className="w-full h-full object-contain"
+    <canvas
+      ref={canvasRef}
+      className={`w-full h-full object-contain ${canvasVisible ? "" : "opacity-0"}`}
     />
   )
 }

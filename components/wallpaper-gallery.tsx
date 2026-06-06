@@ -230,8 +230,10 @@ export function WallpaperGallery({
             <img
               src={currentImage.dataUrl || "/placeholder.svg"}
               alt={`Captured frame ${currentIndex + 1}`}
-              className={`w-full h-full object-contain transition-opacity duration-150 ease-in-out absolute inset-0 ${
-                imageVisible && !isBurnReady ? "opacity-100" : "opacity-0"
+              className={`w-full h-full object-contain absolute inset-0 ${
+                isBurnReady
+                  ? "opacity-0"
+                  : `transition-opacity duration-150 ease-in-out ${imageVisible ? "opacity-100" : "opacity-0"}`
               }`}
             />
           )}
