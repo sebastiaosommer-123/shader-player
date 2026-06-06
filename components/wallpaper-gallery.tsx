@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { CapturedImage } from "@/lib/types"
@@ -17,6 +17,23 @@ interface WallpaperGalleryProps {
   onDelete: (id: string) => void
   onDeleteStart?: (id: string) => void
   initialIndex?: number
+  originRect?: DOMRect | null
+}
+
+function getGalleryTransform(rect: DOMRect): string {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const scaleX = rect.width / vw
+  const scaleY = rect.height / vh
+  const tx = rect.left + rect.width / 2 - vw / 2
+  const ty = rect.top + rect.height / 2 - vh / 2
+  return `translate(${tx}px, ${ty}px) scale(${scaleX}, ${scaleY})`
+}
+
+function getGalleryBorderRadius(rect: DOMRect): string {
+  const scaleX = rect.width / window.innerWidth
+  const scaleY = rect.height / window.innerHeight
+  return `${(8 / scaleX).toFixed(2)}px / ${(8 / scaleY).toFixed(2)}px`
 }
 
 export function WallpaperGallery({
@@ -26,6 +43,7 @@ export function WallpaperGallery({
   onDelete,
   onDeleteStart,
   initialIndex = 0,
+  originRect,
 }: WallpaperGalleryProps) {
   const reversedImages = [...images].reverse()
 
@@ -37,21 +55,31 @@ export function WallpaperGallery({
   const [isBurnReady, setIsBurnReady] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
 
+  const storedOriginRect = useRef<DOMRect | null>(null)
+  const prefersReducedMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+  useEffect(() => {
+    if (isOpen && originRect) {
+      storedOriginRect.current = originRect
+    }
+  }, [isOpen, originRect])
+
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(initialIndex)
       setShouldRender(true)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setIsVisible(true)
-          setImageVisible(true)
-        })
-      })
+      const timeout = setTimeout(() => {
+        setIsVisible(true)
+        setImageVisible(true)
+      }, 0)
+      return () => clearTimeout(timeout)
     } else {
       setIsVisible(false)
       const timeout = setTimeout(() => {
         setShouldRender(false)
-      }, 150)
+      }, 400)
       return () => clearTimeout(timeout)
     }
   }, [isOpen, initialIndex])
@@ -156,11 +184,28 @@ export function WallpaperGallery({
     }
   }
 
+  const origin = storedOriginRect.current
+  const animationStyle: React.CSSProperties =
+    !prefersReducedMotion && origin
+      ? {
+          transform: isVisible ? "translate(0,0) scale(1,1)" : getGalleryTransform(origin),
+          borderRadius: isVisible ? "0px" : getGalleryBorderRadius(origin),
+          opacity: isVisible ? 1 : 0,
+          transition: isVisible
+            ? "transform 500ms cubic-bezier(0.77, 0, 0.175, 1), border-radius 500ms cubic-bezier(0.77, 0, 0.175, 1), opacity 350ms cubic-bezier(0.77, 0, 0.175, 1)"
+            : "transform 400ms cubic-bezier(0.77, 0, 0.175, 1), border-radius 400ms cubic-bezier(0.77, 0, 0.175, 1), opacity 250ms cubic-bezier(0.77, 0, 0.175, 1)",
+          willChange: "transform, opacity",
+          transformOrigin: "center center",
+        }
+      : {
+          opacity: isVisible ? 1 : 0,
+          transition: "opacity 150ms ease-in-out",
+        }
+
   return (
     <div
-      className={`fixed inset-0 bg-background/20 backdrop-blur-xl z-50 flex items-center justify-center transition-opacity duration-150 ease-in-out ${
-        isVisible ? "opacity-100" : "opacity-0"
-      }`}
+      className="fixed inset-0 bg-background/20 backdrop-blur-xl z-50 flex items-center justify-center"
+      style={animationStyle}
       onClick={handleClose}
     >
       {/* Close Button */}

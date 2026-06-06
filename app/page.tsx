@@ -23,6 +23,7 @@ export default function Home() {
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
+  const [galleryOriginRect, setGalleryOriginRect] = useState<DOMRect | null>(null)
   const shaderCanvasRef = useRef<ShaderCanvasRef>(null)
 
   const [captureAnimation, setCaptureAnimation] = useState<{
@@ -81,6 +82,8 @@ export default function Home() {
   }
 
   const handleThumbnailClick = (imageIndex: number) => {
+    const thumb = document.querySelector('[aria-label="View latest capture"]')
+    setGalleryOriginRect(thumb ? thumb.getBoundingClientRect() : null)
     // Gallery reverses images to show newest first, so we need to convert the index
     const reversedIndex = capturedImages.length - 1 - imageIndex
     setSelectedImageIndex(reversedIndex)
@@ -134,6 +137,7 @@ export default function Home() {
         onDelete={handleDeleteImage}
         onDeleteStart={handleDeleteStart}
         initialIndex={selectedImageIndex}
+        originRect={galleryOriginRect}
       />
 
       {captureAnimation && (
