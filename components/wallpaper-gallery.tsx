@@ -275,7 +275,7 @@ export function WallpaperGallery({
         onClick={handleClose}
       >
         {/* Image Display */}
-        <div className="w-screen h-screen relative flex items-center justify-center overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="w-screen h-screen relative flex items-center justify-center overflow-hidden bg-background" onClick={(e) => e.stopPropagation()}>
           {currentImage && (
             <img
               src={currentImage.dataUrl || "/placeholder.svg"}
