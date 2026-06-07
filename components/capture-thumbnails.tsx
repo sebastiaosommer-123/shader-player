@@ -45,7 +45,6 @@ export function CaptureThumbnails({ images, onClick, isCapturing = false, hidden
   return (
     <div
       className={`fixed z-10 ${isMobile ? "top-4 left-1/2 -translate-x-1/2" : "bottom-4 left-6"}`}
-      aria-label="View most recent capture"
     >
       <motion.div
         layoutId={`gallery-container-${latestImage.id}`}

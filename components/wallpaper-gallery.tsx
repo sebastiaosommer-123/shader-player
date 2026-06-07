@@ -143,7 +143,7 @@ export function WallpaperGallery({
       onDelete(currentImage.id)
       const newLength = reversedImages.length - 1
       if (newLength === 0) {
-        onClose()
+        setTimeout(() => onClose(), 150)
       } else if (currentIndex >= newLength) {
         setCurrentIndex(newLength - 1)
       }
@@ -184,7 +184,6 @@ export function WallpaperGallery({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={prefersReducedMotion ? reducedTransition : { duration: 0.25, ease: "easeOut" }}
-        onClick={handleClose}
       />
 
       {/* Image container — shared element transition from thumbnail */}
@@ -233,7 +232,7 @@ export function WallpaperGallery({
         className="fixed inset-0 pointer-events-none"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        exit={{ opacity: 0, transition: { duration: 0.18, delay: 0 } }}
         transition={
           prefersReducedMotion
             ? reducedTransition
