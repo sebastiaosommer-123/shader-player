@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
+import { AnimatePresence } from "framer-motion"
 import { ShaderCanvas, type ShaderCanvasRef } from "@/components/shader-canvas"
 import { FloatingControlsPanel } from "@/components/floating-controls-panel"
 import { MobileNav } from "@/components/mobile-nav"
@@ -16,14 +17,14 @@ import type { Rect } from "@/lib/animation-utils"
 import { getShaderConfig } from "@/lib/shader-configs"
 
 export default function Home() {
-  const [shaderId, setShaderId] = useState<string>('terracotta')
-  const [params, setParams] = useState<ShaderParams>(getShaderConfig('terracotta').defaultParams)
+  const [shaderId, setShaderId] = useState<string>("terracotta")
+  const [params, setParams] = useState<ShaderParams>(getShaderConfig("terracotta").defaultParams)
 
   const [capturedImages, setCapturedImages] = useState<CapturedImage[]>([])
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const [clickedImageId, setClickedImageId] = useState<string | null>(null)
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
-  const [galleryOriginRect, setGalleryOriginRect] = useState<DOMRect | null>(null)
   const shaderCanvasRef = useRef<ShaderCanvasRef>(null)
 
   const [captureAnimation, setCaptureAnimation] = useState<{
@@ -46,7 +47,6 @@ export default function Home() {
 
     const isMobile = window.innerWidth < 768
     const captured = captureCanvas({ canvas, params, isMobile })
-
     const positions = calculateAnimationPositions(canvas, 0, isMobile)
 
     const newImage: CapturedImage = {
@@ -78,13 +78,13 @@ export default function Home() {
 
   const handleGalleryClose = () => {
     setIsGalleryOpen(false)
-    setDeletingImageId(null) // Reset optimistic delete if cancelled/closed
+    setDeletingImageId(null)
   }
 
   const handleThumbnailClick = (imageIndex: number) => {
-    const thumb = document.querySelector('[aria-label="View latest capture"]')
-    setGalleryOriginRect(thumb ? thumb.getBoundingClientRect() : null)
-    // Gallery reverses images to show newest first, so we need to convert the index
+    const clickedImage = capturedImages[imageIndex]
+    if (!clickedImage) return
+    setClickedImageId(clickedImage.id)
     const reversedIndex = capturedImages.length - 1 - imageIndex
     setSelectedImageIndex(reversedIndex)
     setIsGalleryOpen(true)
@@ -99,7 +99,6 @@ export default function Home() {
 
   return (
     <div className="h-screen w-screen overflow-hidden">
-      {/* Shader Canvas — full viewport */}
       <div className="fixed inset-0">
         <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} isPaused={isGalleryOpen} />
       </div>
@@ -112,8 +111,8 @@ export default function Home() {
       />
 
       <MobileNav
-        onCapture={handleCapture} 
-        params={params} 
+        onCapture={handleCapture}
+        params={params}
         setParams={setParams}
         shaderId={shaderId}
         onShaderChange={handleShaderChange}
@@ -121,21 +120,26 @@ export default function Home() {
 
       <CaptureButton onCapture={handleCapture} />
 
-      <CaptureThumbnails 
-        images={capturedImages} 
-        onClick={handleThumbnailClick} 
+      <CaptureThumbnails
+        images={capturedImages}
+        onClick={handleThumbnailClick}
         isCapturing={!!captureAnimation}
         hiddenImageId={deletingImageId}
       />
-      <WallpaperGallery
-        images={capturedImages}
-        isOpen={isGalleryOpen}
-        onClose={handleGalleryClose}
-        onDelete={handleDeleteImage}
-        onDeleteStart={handleDeleteStart}
-        initialIndex={selectedImageIndex}
-        originRect={galleryOriginRect}
-      />
+
+      <AnimatePresence>
+        {isGalleryOpen && clickedImageId && (
+          <WallpaperGallery
+            key="gallery"
+            images={capturedImages}
+            onClose={handleGalleryClose}
+            onDelete={handleDeleteImage}
+            onDeleteStart={handleDeleteStart}
+            initialIndex={selectedImageIndex}
+            openedImageId={clickedImageId}
+          />
+        )}
+      </AnimatePresence>
 
       {captureAnimation && (
         <CaptureAnimationOverlay
