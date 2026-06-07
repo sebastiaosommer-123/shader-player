@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Rnd } from "react-rnd"
-import { ChevronUp, Minus } from "lucide-react"
+import { Plus, Minus } from "lucide-react"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import { ParameterSlider } from "./parameter-slider"
 import { ColorPicker } from "./color-picker"
@@ -156,7 +156,7 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
               className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hoverFine:text-foreground hoverFine:bg-accent transition-colors flex-shrink-0"
               aria-label={isCollapsed ? "Expand controls" : "Collapse controls"}
             >
-              {isCollapsed ? <ChevronUp className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+              {isCollapsed ? <Plus className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
             </button>
           </div>
 
