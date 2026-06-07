@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Rnd } from "react-rnd"
 import { ChevronUp, Minus } from "lucide-react"
-import { cn } from "@/lib/utils"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import { ParameterSlider } from "./parameter-slider"
 import { ColorPicker } from "./color-picker"
@@ -46,6 +45,7 @@ function clamp(value: number, min: number, max: number): number {
 export function FloatingControlsPanel({ params, setParams, shaderId, onShaderChange }: FloatingControlsPanelProps) {
   const [mounted, setMounted] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const rndRef = useRef<Rnd>(null)
   const [position, setPosition] = useState({ x: 0, y: 24 })
   const [size, setSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT })
   const [expandedHeight, setExpandedHeight] = useState(DEFAULT_HEIGHT)
@@ -71,10 +71,20 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
 
   const shaderConfig = getShaderConfig(shaderId)
 
+  const COLLAPSE_DURATION = 220
+
   const handleCollapse = () => {
+    // Set transition directly on the DOM element before React's size update lands,
+    // so the browser sees a previous painted state to interpolate from.
+    const el = rndRef.current?.getSelfElement() as HTMLElement | null
+    if (el) {
+      el.style.transition = `height ${COLLAPSE_DURATION}ms cubic-bezier(0.23, 1, 0.32, 1)`
+      setTimeout(() => { el.style.transition = '' }, COLLAPSE_DURATION + 50)
+    }
+
     if (isCollapsed) {
-      setSize(prev => ({ ...prev, height: expandedHeight }))
       setIsCollapsed(false)
+      setSize(prev => ({ ...prev, height: expandedHeight }))
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         x: position.x, y: position.y,
         width: size.width, height: expandedHeight,
@@ -82,7 +92,7 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
       }))
     } else {
       setIsCollapsed(true)
-      setTimeout(() => setSize(prev => ({ ...prev, height: HEADER_HEIGHT })), 130)
+      setSize(prev => ({ ...prev, height: HEADER_HEIGHT }))
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         x: position.x, y: position.y,
         width: size.width, height: expandedHeight,
@@ -96,6 +106,7 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
   return (
     <div className="hidden md:block fixed inset-0 pointer-events-none z-40">
       <Rnd
+        ref={rndRef}
         size={size}
         position={position}
         bounds="parent"
@@ -151,10 +162,13 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
 
           {/* Body */}
           <div
-            className={cn(
-              "flex-1 overflow-hidden transition-opacity",
-              isCollapsed ? "opacity-0 duration-[120ms]" : "opacity-100 duration-[150ms]"
-            )}
+            className="flex-1 overflow-hidden"
+            style={{
+              opacity: isCollapsed ? 0 : 1,
+              transition: isCollapsed
+                ? 'opacity 120ms ease-out'
+                : 'opacity 180ms ease-out 60ms',
+            }}
           >
             <div className="h-full overflow-y-auto">
               <div className="p-4 space-y-5">
