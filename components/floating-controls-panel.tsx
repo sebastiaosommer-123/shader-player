@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Rnd } from "react-rnd"
-import { SlidersHorizontal, ChevronUp, Minus } from "lucide-react"
+import { ChevronUp, Minus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import { ParameterSlider } from "./parameter-slider"
@@ -129,7 +129,7 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
           }))
         }}
       >
-        <div className="flex flex-col h-full bg-background/90 backdrop-blur-md border border-border rounded-xl shadow-2xl overflow-hidden">
+        <div className="flex flex-col h-full bg-background backdrop-blur-md border border-border rounded-xl shadow-2xl overflow-hidden">
           {/* Header / drag handle */}
           <div className="drag-handle flex items-center gap-2 px-3 border-b border-border/50 cursor-grab active:cursor-grabbing select-none flex-shrink-0" style={{ height: HEADER_HEIGHT }}>
             <div className="grid gap-[3px] opacity-25 flex-shrink-0" style={{ gridTemplateColumns: "repeat(3, 3px)" }}>
@@ -138,8 +138,7 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
               ))}
             </div>
             <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              <SlidersHorizontal className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-              <span className="text-xs text-muted-foreground truncate">{shaderConfig.name}</span>
+<span className="text-sm text-foreground font-normal truncate">Shader Controls</span>
             </div>
             <button
               onClick={e => { e.stopPropagation(); handleCollapse() }}
