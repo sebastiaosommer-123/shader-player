@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { flushSync } from "react-dom"
+import { motion } from "framer-motion"
 import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { CapturedImage } from "@/lib/types"
@@ -13,84 +14,35 @@ import { ScanLineOverlay } from "@/components/scan-line-overlay"
 
 interface WallpaperGalleryProps {
   images: CapturedImage[]
-  isOpen: boolean
   onClose: () => void
   onDelete: (id: string) => void
   onDeleteStart?: (id: string) => void
   initialIndex?: number
-  originRect?: DOMRect | null
-}
-
-function getGalleryTransform(rect: DOMRect): string {
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const scaleX = rect.width / vw
-  const scaleY = rect.height / vh
-  const tx = rect.left + rect.width / 2 - vw / 2
-  const ty = rect.top + rect.height / 2 - vh / 2
-  return `translate(${tx}px, ${ty}px) scale(${scaleX}, ${scaleY})`
-}
-
-function getGalleryBorderRadius(rect: DOMRect): string {
-  const scaleX = rect.width / window.innerWidth
-  const scaleY = rect.height / window.innerHeight
-  return `${(8 / scaleX).toFixed(2)}px / ${(8 / scaleY).toFixed(2)}px`
+  openedImageId: string
 }
 
 export function WallpaperGallery({
   images,
-  isOpen,
   onClose,
   onDelete,
   onDeleteStart,
   initialIndex = 0,
-  originRect,
+  openedImageId,
 }: WallpaperGalleryProps) {
   const reversedImages = [...images].reverse()
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
-  const [isVisible, setIsVisible] = useState(false)
-  const [shouldRender, setShouldRender] = useState(false)
   const [imageVisible, setImageVisible] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isBurnReady, setIsBurnReady] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
-
   const [slideX, setSlideX] = useState(0)
   const [slideTransition, setSlideTransition] = useState(true)
   const isNavigatingRef = useRef(false)
 
-  const storedOriginRect = useRef<DOMRect | null>(null)
   const prefersReducedMotion =
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
-
-  useEffect(() => {
-    if (isOpen && originRect) {
-      storedOriginRect.current = originRect
-    }
-  }, [isOpen, originRect])
-
-  useEffect(() => {
-    if (isOpen) {
-      setCurrentIndex(initialIndex)
-      setShouldRender(true)
-      setSlideX(0)
-      setSlideTransition(true)
-      isNavigatingRef.current = false
-      const timeout = setTimeout(() => {
-        setIsVisible(true)
-        setImageVisible(true)
-      }, 0)
-      return () => clearTimeout(timeout)
-    } else {
-      setIsVisible(false)
-      const timeout = setTimeout(() => {
-        setShouldRender(false)
-      }, 400)
-      return () => clearTimeout(timeout)
-    }
-  }, [isOpen, initialIndex])
 
   useEffect(() => {
     if (currentIndex >= reversedImages.length && reversedImages.length > 0) {
@@ -101,7 +53,7 @@ export function WallpaperGallery({
   }, [reversedImages.length, currentIndex, onClose])
 
   useEffect(() => {
-    if (shouldRender && !isNavigatingRef.current) {
+    if (!isNavigatingRef.current) {
       setImageVisible(true)
       setSlideX(0)
       setSlideTransition(true)
@@ -109,9 +61,7 @@ export function WallpaperGallery({
       setIsBurnReady(false)
       setIsScanning(false)
     }
-  }, [currentIndex, shouldRender])
-
-  if (!shouldRender) return null
+  }, [currentIndex])
 
   const currentImage = reversedImages[currentIndex]
   if (!currentImage) return null
@@ -174,9 +124,7 @@ export function WallpaperGallery({
 
   const handleDownload = () => {
     playDigitalClick("strong")
-    if (currentImage) {
-      setIsScanning(true)
-    }
+    if (currentImage) setIsScanning(true)
   }
 
   const handleDelete = () => {
@@ -187,9 +135,7 @@ export function WallpaperGallery({
     }
   }
 
-  const handleBurnReady = () => {
-    setIsBurnReady(true)
-  }
+  const handleBurnReady = () => setIsBurnReady(true)
 
   const handleBurnComplete = () => {
     if (currentImage) {
@@ -197,33 +143,19 @@ export function WallpaperGallery({
       onDelete(currentImage.id)
       const newLength = reversedImages.length - 1
       if (newLength === 0) {
-        setIsVisible(false)
-        setTimeout(() => {
-          onClose()
-        }, 150)
+        onClose()
       } else if (currentIndex >= newLength) {
         setCurrentIndex(newLength - 1)
       }
       setIsDeleting(false)
       setIsBurnReady(false)
-      setTimeout(() => {
-        setImageVisible(true)
-      }, 50)
+      setTimeout(() => setImageVisible(true), 50)
     }
   }
 
   const handleClose = () => {
     playDigitalClick("strong")
     onClose()
-  }
-
-  const displayCount = isDeleting ? Math.max(0, reversedImages.length - 1) : reversedImages.length
-
-  let displayIndex = currentIndex
-  if (isDeleting && displayCount > 0) {
-    if (currentIndex >= displayCount) {
-      displayIndex = Math.max(0, displayCount - 1)
-    }
   }
 
   const handleScanComplete = () => {
@@ -234,90 +166,83 @@ export function WallpaperGallery({
     }
   }
 
-  const origin = storedOriginRect.current
-  const animationStyle: React.CSSProperties =
-    !prefersReducedMotion && origin
-      ? {
-          transform: isVisible ? "translate(0,0) scale(1,1)" : getGalleryTransform(origin),
-          borderRadius: isVisible ? "0px" : getGalleryBorderRadius(origin),
-          opacity: isVisible ? 1 : 0,
-          transition: isVisible
-            ? "transform 500ms cubic-bezier(0.77, 0, 0.175, 1), border-radius 500ms cubic-bezier(0.77, 0, 0.175, 1), opacity 350ms cubic-bezier(0.77, 0, 0.175, 1)"
-            : "transform 400ms cubic-bezier(0.77, 0, 0.175, 1), border-radius 400ms cubic-bezier(0.77, 0, 0.175, 1), opacity 250ms cubic-bezier(0.77, 0, 0.175, 1)",
-          willChange: "transform, opacity",
-          transformOrigin: "center center",
-        }
-      : {
-          opacity: isVisible ? 1 : 0,
-          transition: "opacity 150ms ease-in-out",
-        }
+  const displayCount = isDeleting ? Math.max(0, reversedImages.length - 1) : reversedImages.length
+  let displayIndex = currentIndex
+  if (isDeleting && displayCount > 0 && currentIndex >= displayCount) {
+    displayIndex = Math.max(0, displayCount - 1)
+  }
 
-  const uiOverlayStyle: React.CSSProperties = !prefersReducedMotion
-    ? {
-        opacity: isVisible ? 1 : 0,
-        filter: isVisible ? "blur(0px)" : "blur(6px)",
-        transition: isVisible
-          ? "opacity 180ms cubic-bezier(0.23, 1, 0.32, 1), filter 180ms cubic-bezier(0.23, 1, 0.32, 1)"
-          : "opacity 140ms cubic-bezier(0.23, 1, 0.32, 1), filter 140ms cubic-bezier(0.23, 1, 0.32, 1)",
-        transitionDelay: isVisible ? "320ms" : "0ms",
-      }
-    : {
-        opacity: isVisible ? 1 : 0,
-        transition: "opacity 150ms ease",
-      }
+  const springTransition = { type: "spring" as const, stiffness: 280, damping: 28 }
+  const reducedTransition = { duration: 0.15, ease: "easeInOut" as const }
 
   return (
     <div className="fixed inset-0 z-50">
-      {/* Layer 1: backdrop + image — thumbnail expansion animation */}
-      <div
-        className="fixed inset-0 bg-background/20 backdrop-blur-xl flex items-center justify-center"
-        style={animationStyle}
+      {/* Background — fades in/out independently */}
+      <motion.div
+        className="fixed inset-0 bg-background"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={prefersReducedMotion ? reducedTransition : { duration: 0.25, ease: "easeOut" }}
+        onClick={handleClose}
+      />
+
+      {/* Image container — shared element transition from thumbnail */}
+      <motion.div
+        layoutId={`gallery-container-${openedImageId}`}
+        className="fixed inset-0 overflow-hidden"
+        style={{ borderRadius: 0 }}
+        transition={prefersReducedMotion ? reducedTransition : springTransition}
         onClick={handleClose}
       >
-        {/* Image Display */}
-        <div className="w-screen h-screen relative flex items-center justify-center overflow-hidden bg-background" onClick={(e) => e.stopPropagation()}>
-          {currentImage && (
-            <img
-              src={currentImage.dataUrl || "/placeholder.svg"}
-              alt={`Captured frame ${currentIndex + 1}`}
-              className="w-full h-full object-contain absolute inset-0"
-              style={
-                prefersReducedMotion
-                  ? { opacity: imageVisible ? 1 : 0, transition: "opacity 150ms ease-in-out" }
-                  : {
-                      opacity: isBurnReady ? 0 : imageVisible ? 1 : 0,
-                      transform: `translateX(${slideX}px)`,
-                      transition: slideTransition
-                        ? "transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out"
-                        : "none",
-                    }
-              }
-            />
-          )}
+        {currentImage && (
+          <img
+            src={currentImage.dataUrl || "/placeholder.svg"}
+            alt={`Captured frame ${currentIndex + 1}`}
+            className="w-full h-full object-contain"
+            style={
+              prefersReducedMotion
+                ? { opacity: imageVisible ? 1 : 0, transition: "opacity 150ms ease-in-out" }
+                : {
+                    opacity: isBurnReady ? 0 : imageVisible ? 1 : 0,
+                    transform: `translateX(${slideX}px)`,
+                    transition: slideTransition
+                      ? "transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out"
+                      : "none",
+                  }
+            }
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
 
-          {isDeleting && currentImage && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-              <BurningImage src={currentImage.dataUrl} onComplete={handleBurnComplete} onReady={handleBurnReady} />
-            </div>
-          )}
+        {isDeleting && currentImage && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <BurningImage src={currentImage.dataUrl} onComplete={handleBurnComplete} onReady={handleBurnReady} />
+          </div>
+        )}
 
-          {isScanning && currentImage && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-              <ScanLineOverlay src={currentImage.dataUrl} onComplete={handleScanComplete} />
-            </div>
-          )}
-        </div>
-      </div>
+        {isScanning && currentImage && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <ScanLineOverlay src={currentImage.dataUrl} onComplete={handleScanComplete} />
+          </div>
+        )}
+      </motion.div>
 
-      {/* Layer 2: UI controls — blur-fade only, independent of image scale */}
-      <div className="fixed inset-0 pointer-events-none" style={uiOverlayStyle}>
-        {/* Close Button */}
+      {/* UI controls — fade in after image settles */}
+      <motion.div
+        className="fixed inset-0 pointer-events-none"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={
+          prefersReducedMotion
+            ? reducedTransition
+            : { duration: 0.18, delay: 0.3, ease: "easeOut" }
+        }
+      >
         {displayCount > 0 && (
           <Button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleClose()
-            }}
+            onClick={(e) => { e.stopPropagation(); handleClose() }}
             variant="ghost"
             size="icon"
             className="absolute top-4 right-4 pointer-events-auto cursor-pointer rounded-full bg-black/40 border border-white/20 hover:bg-black/20 size-11 transition-[background,transform] duration-150 active:scale-[0.97]"
@@ -329,22 +254,17 @@ export function WallpaperGallery({
 
         {currentImage && (
           <>
-            {/* Image Counter */}
             {displayCount > 0 && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full font-medium bg-[rgba(10,10,10,0.2717391304347826)] px-3 py-1.5 text-sm">
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full font-medium bg-[rgba(10,10,10,0.27)] px-3 py-1.5 text-sm">
                 {displayIndex + 1} / {displayCount}
               </div>
             )}
 
-            {/* Navigation Arrows */}
             {reversedImages.length > 1 && (
               <>
                 {currentIndex > 0 && (
                   <Button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handlePrevious()
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handlePrevious() }}
                     variant="ghost"
                     size="icon"
                     className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer h-12 w-12 rounded-full bg-black/40 border border-white/20 hover:bg-black/20 transition-[background,transform] duration-150 active:scale-[0.97]"
@@ -356,10 +276,7 @@ export function WallpaperGallery({
 
                 {currentIndex < reversedImages.length - 1 && (
                   <Button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleNext()
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleNext() }}
                     variant="ghost"
                     size="icon"
                     className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer rounded-full bg-black/40 border border-white/20 hover:bg-black/20 w-11 h-11 transition-[background,transform] duration-150 active:scale-[0.97]"
@@ -371,29 +288,19 @@ export function WallpaperGallery({
               </>
             )}
 
-            {/* Action Buttons */}
             {displayCount > 0 && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                 <Button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDelete()
-                  }}
+                  onClick={(e) => { e.stopPropagation(); handleDelete() }}
                   className="pointer-events-auto cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-[rgba(202,82,82,1)] h-11 text-sm hover:bg-[rgba(202,82,82,1)] hover:brightness-110 active:scale-[0.97] transition-[background,transform] duration-150 font-medium"
                 >
                   <Trash2 className="h-5 w-5" />
                   Delete
                 </Button>
                 <Button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDownload()
-                  }}
+                  onClick={(e) => { e.stopPropagation(); handleDownload() }}
                   className="pointer-events-auto cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-background h-11 text-sm hover:bg-zinc-800 active:scale-[0.97] transition-[background,transform] duration-150 font-medium"
-                  style={{
-                    WebkitTapHighlightColor: "transparent",
-                    touchAction: "manipulation",
-                  }}
+                  style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
                 >
                   <Download className="h-5 w-5" />
                   Download
@@ -402,7 +309,7 @@ export function WallpaperGallery({
             )}
           </>
         )}
-      </div>
+      </motion.div>
     </div>
   )
 }
