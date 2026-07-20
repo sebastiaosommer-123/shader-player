@@ -18,13 +18,15 @@ interface FloatingControlsPanelProps {
 }
 
 const HEADER_HEIGHT = 36
-const DEFAULT_WIDTH = 280
-const DEFAULT_HEIGHT = 360
+const DEFAULT_WIDTH = 300
+const DEFAULT_HEIGHT = 450
+// Corner grab area, larger than the 15px grip it sits over.
+const RESIZE_HANDLE_SIZE = 28
 const STORAGE_KEY = "shader-player:panel-state"
 
+// Position is deliberately not persisted — the panel returns to its default
+// top-right spot on every reload.
 interface PanelState {
-  x: number
-  y: number
   width: number
   height: number
   isCollapsed: boolean
@@ -38,8 +40,12 @@ function loadState(): Partial<PanelState> {
   }
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
+function saveState(state: PanelState) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+}
+
+function defaultPosition(width: number) {
+  return { x: Math.max(0, window.innerWidth - width - 24), y: 24 }
 }
 
 export function FloatingControlsPanel({ params, setParams, shaderId, onShaderChange }: FloatingControlsPanelProps) {
@@ -53,12 +59,11 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
   useEffect(() => {
     const saved = loadState()
     const w = saved.width ?? DEFAULT_WIDTH
-    const h = saved.height ?? DEFAULT_HEIGHT
+    // Keep the panel inside the viewport on short windows.
+    const h = Math.min(saved.height ?? DEFAULT_HEIGHT, window.innerHeight - 48)
     const collapsed = saved.isCollapsed ?? false
-    const x = clamp(saved.x ?? window.innerWidth - w - 24, 0, window.innerWidth - w)
-    const y = clamp(saved.y ?? 24, 0, window.innerHeight - HEADER_HEIGHT)
 
-    setPosition({ x, y })
+    setPosition(defaultPosition(w))
     setExpandedHeight(h)
     setSize({ width: w, height: collapsed ? HEADER_HEIGHT : h })
     setIsCollapsed(collapsed)
@@ -85,19 +90,11 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
     if (isCollapsed) {
       setIsCollapsed(false)
       setSize(prev => ({ ...prev, height: expandedHeight }))
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        x: position.x, y: position.y,
-        width: size.width, height: expandedHeight,
-        isCollapsed: false,
-      }))
+      saveState({ width: size.width, height: expandedHeight, isCollapsed: false })
     } else {
       setIsCollapsed(true)
       setSize(prev => ({ ...prev, height: HEADER_HEIGHT }))
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        x: position.x, y: position.y,
-        width: size.width, height: expandedHeight,
-        isCollapsed: true,
-      }))
+      saveState({ width: size.width, height: expandedHeight, isCollapsed: true })
     }
   }
 
@@ -115,15 +112,18 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
         minHeight={isCollapsed ? HEADER_HEIGHT : 200}
         dragHandleClassName="drag-handle"
         enableResizing={isCollapsed ? false : { bottomRight: true }}
+        resizeHandleStyles={{
+          bottomRight: {
+            width: RESIZE_HANDLE_SIZE,
+            height: RESIZE_HANDLE_SIZE,
+            right: 0,
+            bottom: 0,
+            cursor: "nwse-resize",
+          },
+        }}
         style={{ pointerEvents: "auto" }}
         onDragStop={(_e, d) => {
-          const newPos = { x: d.x, y: d.y }
-          setPosition(newPos)
-          localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            x: newPos.x, y: newPos.y,
-            width: size.width, height: expandedHeight,
-            isCollapsed,
-          }))
+          setPosition({ x: d.x, y: d.y })
         }}
         onResizeStop={(_e, _dir, ref, _delta, pos) => {
           const newSize = {
@@ -133,14 +133,10 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
           setSize(newSize)
           setExpandedHeight(newSize.height)
           setPosition(pos)
-          localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            x: pos.x, y: pos.y,
-            width: newSize.width, height: newSize.height,
-            isCollapsed,
-          }))
+          saveState({ width: newSize.width, height: newSize.height, isCollapsed })
         }}
       >
-        <div className="flex flex-col h-full bg-background backdrop-blur-md border border-border rounded-xl shadow-2xl overflow-hidden">
+        <div className="relative flex flex-col h-full bg-background backdrop-blur-md border border-border rounded-xl shadow-2xl overflow-hidden">
           {/* Header / drag handle */}
           <div className="drag-handle flex items-center gap-2 px-3 border-b border-border/50 cursor-grab active:cursor-grabbing select-none flex-shrink-0" style={{ height: HEADER_HEIGHT }}>
             <div className="grid gap-[3px] opacity-25 flex-shrink-0" style={{ gridTemplateColumns: "repeat(3, 3px)" }}>
@@ -209,6 +205,26 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
               </div>
             </div>
           </div>
+
+          {/* Resize affordance. Purely visual — the Rnd handle above it takes the drag. */}
+          {!isCollapsed && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute bottom-1.5 right-1.5 grid gap-[3px] opacity-25"
+              style={{ gridTemplateColumns: "repeat(3, 3px)" }}
+            >
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={
+                    Math.floor(i / 3) + (i % 3) >= 2
+                      ? "w-[3px] h-[3px] rounded-full bg-foreground"
+                      : "w-[3px] h-[3px]"
+                  }
+                />
+              ))}
+            </div>
+          )}
         </div>
       </Rnd>
     </div>
