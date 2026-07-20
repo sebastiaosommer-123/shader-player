@@ -3,7 +3,7 @@
 import { useState, useRef } from "react"
 import { AnimatePresence } from "framer-motion"
 import { ShaderCanvas, type ShaderCanvasRef } from "@/components/shader-canvas"
-import { FloatingControlsPanel } from "@/components/floating-controls-panel"
+import { ControlsSidebar } from "@/components/controls-sidebar"
 import { MobileNav } from "@/components/mobile-nav"
 import { CaptureButton } from "@/components/capture-button"
 import { CaptureThumbnails } from "@/components/capture-thumbnails"
@@ -98,17 +98,21 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden">
-      <div className="fixed inset-0">
+    <div className="h-screen w-screen flex flex-col md:flex-row overflow-hidden">
+      {/* Shader Canvas */}
+      <div className="flex-1 relative">
         <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} isPaused={isGalleryOpen} />
       </div>
 
-      <FloatingControlsPanel
-        params={params}
-        setParams={setParams}
-        shaderId={shaderId}
-        onShaderChange={handleShaderChange}
-      />
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <ControlsSidebar
+          params={params}
+          setParams={setParams}
+          shaderId={shaderId}
+          onShaderChange={handleShaderChange}
+        />
+      </div>
 
       <MobileNav
         onCapture={handleCapture}
