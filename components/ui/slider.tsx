@@ -68,7 +68,7 @@ function Slider({
                 transform: activeThumbIndex === index ? 'scale(0.97)' : 'scale(1)'
               }}
               className={cn(
-                "block h-4 w-2 rounded-full border-0 shadow-sm transition-all duration-150",
+                "block h-4 w-2 rounded-full border-0 shadow-sm transition-[transform,background-color] duration-150 ease-out motion-reduce:transition-none",
                 "bg-ring",
                 isHovered && "bg-zinc-400"
               )}

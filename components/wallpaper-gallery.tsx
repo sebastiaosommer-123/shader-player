@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { flushSync } from "react-dom"
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { CapturedImage } from "@/lib/types"
@@ -40,9 +40,7 @@ export function WallpaperGallery({
   const [slideTransition, setSlideTransition] = useState(true)
   const isNavigatingRef = useRef(false)
 
-  const prefersReducedMotion =
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  const prefersReducedMotion = useReducedMotion()
 
   useEffect(() => {
     if (currentIndex >= reversedImages.length && reversedImages.length > 0) {
@@ -69,10 +67,7 @@ export function WallpaperGallery({
   const handlePrevious = () => {
     playDigitalClick("strong")
     if (prefersReducedMotion) {
-      setImageVisible(false)
-      setTimeout(() => {
-        setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reversedImages.length - 1))
-      }, 150)
+      setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reversedImages.length - 1))
       return
     }
     isNavigatingRef.current = true
@@ -97,10 +92,7 @@ export function WallpaperGallery({
   const handleNext = () => {
     playDigitalClick("strong")
     if (prefersReducedMotion) {
-      setImageVisible(false)
-      setTimeout(() => {
-        setCurrentIndex((prev) => (prev < reversedImages.length - 1 ? prev + 1 : 0))
-      }, 150)
+      setCurrentIndex((prev) => (prev < reversedImages.length - 1 ? prev + 1 : 0))
       return
     }
     isNavigatingRef.current = true
@@ -124,12 +116,23 @@ export function WallpaperGallery({
 
   const handleDownload = () => {
     playDigitalClick("strong")
-    if (currentImage) setIsScanning(true)
+    if (!currentImage) return
+    if (prefersReducedMotion) {
+      downloadImage(currentImage.dataUrl, currentImage.params as any, currentImage.timestamp)
+      playDownloadConfirmation("strong")
+      return
+    }
+    setIsScanning(true)
   }
 
   const handleDelete = () => {
     playDigitalClick("strong")
     if (currentImage) {
+      if (prefersReducedMotion) {
+        onDeleteStart?.(currentImage.id)
+        onDelete(currentImage.id)
+        return
+      }
       setIsDeleting(true)
       onDeleteStart?.(currentImage.id)
     }
@@ -244,7 +247,7 @@ export function WallpaperGallery({
             onClick={(e) => { e.stopPropagation(); handleClose() }}
             variant="ghost"
             size="icon"
-            className="absolute top-4 right-4 pointer-events-auto cursor-pointer rounded-full bg-black/40 border border-white/20 hover:bg-black/20 size-11 transition-[background,transform] duration-150 active:scale-[0.97]"
+            className="absolute top-4 right-4 pointer-events-auto cursor-pointer rounded-full bg-black/40 border border-white/20 hoverFine:bg-black/20 size-11 transition-[background-color,transform] duration-150 active:scale-[0.97]"
             aria-label="Close gallery"
           >
             <X className="h-6 w-6" />
@@ -266,7 +269,7 @@ export function WallpaperGallery({
                     onClick={(e) => { e.stopPropagation(); handlePrevious() }}
                     variant="ghost"
                     size="icon"
-                    className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer h-12 w-12 rounded-full bg-black/40 border border-white/20 hover:bg-black/20 transition-[background,transform] duration-150 active:scale-[0.97]"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer h-12 w-12 rounded-full bg-black/40 border border-white/20 hoverFine:bg-black/20 transition-[background-color,transform] duration-150 active:scale-[0.97]"
                     aria-label="Previous image"
                   >
                     <ChevronLeft className="h-8 w-8" />
@@ -278,7 +281,7 @@ export function WallpaperGallery({
                     onClick={(e) => { e.stopPropagation(); handleNext() }}
                     variant="ghost"
                     size="icon"
-                    className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer rounded-full bg-black/40 border border-white/20 hover:bg-black/20 w-11 h-11 transition-[background,transform] duration-150 active:scale-[0.97]"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer rounded-full bg-black/40 border border-white/20 hoverFine:bg-black/20 w-11 h-11 transition-[background-color,transform] duration-150 active:scale-[0.97]"
                     aria-label="Next image"
                   >
                     <ChevronRight className="h-8 w-8" />
@@ -291,14 +294,14 @@ export function WallpaperGallery({
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                 <Button
                   onClick={(e) => { e.stopPropagation(); handleDelete() }}
-                  className="pointer-events-auto cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-[rgba(202,82,82,1)] h-11 text-sm hover:bg-[rgba(202,82,82,1)] hover:brightness-110 active:scale-[0.97] transition-[background,transform] duration-150 font-medium"
+                  className="pointer-events-auto cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-[rgba(202,82,82,1)] h-11 text-sm hoverFine:brightness-110 active:scale-[0.97] transition-[filter,transform] duration-150 font-medium"
                 >
                   <Trash2 className="h-5 w-5" />
                   Delete
                 </Button>
                 <Button
                   onClick={(e) => { e.stopPropagation(); handleDownload() }}
-                  className="pointer-events-auto cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-background h-11 text-sm hover:bg-zinc-800 active:scale-[0.97] transition-[background,transform] duration-150 font-medium"
+                  className="pointer-events-auto cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-background h-11 text-sm hoverFine:bg-zinc-800 active:scale-[0.97] transition-[background-color,transform] duration-150 font-medium"
                   style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
                 >
                   <Download className="h-5 w-5" />

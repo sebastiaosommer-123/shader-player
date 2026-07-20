@@ -5,6 +5,7 @@ import { useState } from "react"
 import { getAllShaderIds, getShaderConfig } from "@/lib/shader-configs"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { cn } from "@/lib/utils"
+import { useReducedMotion } from "framer-motion"
 
 interface ShaderSelectorProps {
   currentShaderId: string
@@ -13,6 +14,9 @@ interface ShaderSelectorProps {
 
 export function ShaderSelector({ currentShaderId, onShaderChange }: ShaderSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const prefersReducedMotion = useReducedMotion()
+  let transitionDuration = isOpen ? '150ms' : '120ms'
+  if (prefersReducedMotion) transitionDuration = '0ms'
   const shaderIds = getAllShaderIds()
   const currentShader = getShaderConfig(currentShaderId)
 
@@ -49,10 +53,14 @@ export function ShaderSelector({ currentShaderId, onShaderChange }: ShaderSelect
       <div
         className={cn(
           "absolute top-full left-0 right-0 mt-1 bg-popover border border-border shadow-lg overflow-hidden z-20",
-          "transition-[opacity,transform] duration-150 origin-top",
+          "transition-[opacity,transform] origin-top",
           isOpen ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-95 pointer-events-none"
         )}
-        style={{ borderRadius: '8px' }}
+        style={{
+          borderRadius: '8px',
+          transitionDuration,
+          transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)',
+        }}
       >
         {shaderIds.map((shaderId) => {
           const shader = getShaderConfig(shaderId)

@@ -7,6 +7,7 @@ import { getShaderConfig } from "@/lib/shader-configs"
 import { X } from "lucide-react"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { CreditsFooter } from "./credits-footer"
+import { useReducedMotion } from "framer-motion"
 
 interface ControlsSheetProps {
   params: ShaderParams
@@ -18,6 +19,13 @@ interface ControlsSheetProps {
 }
 
 export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId, onShaderChange }: ControlsSheetProps) {
+  const prefersReducedMotion = useReducedMotion()
+  let sheetDuration = open ? "250ms" : "200ms"
+  let contentDuration = open ? "150ms" : "100ms"
+  if (prefersReducedMotion) {
+    sheetDuration = "0ms"
+    contentDuration = "0ms"
+  }
   const updateParam = (key: string, value: number | string) => {
     setParams({ ...params, [key]: value })
   }
@@ -27,12 +35,11 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId,
   return (
     <>
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 bg-black text-white rounded-t-2xl border-t border-white/10 h-[400px] sm:h-[80vh] transition-transform duration-[300ms]"
+        className="fixed bottom-0 left-0 right-0 z-50 bg-black text-white rounded-t-2xl border-t border-white/10 h-[400px] sm:h-[80vh] transition-transform"
         style={{
           transform: open ? "translateY(0)" : "translateY(100%)",
-          transitionTimingFunction: open
-            ? "cubic-bezier(0.0, 0.0, 0.2, 1)"
-            : "cubic-bezier(0.4, 0.0, 1, 1)",
+          transitionDuration: sheetDuration,
+          transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
         }}
       >
         <button
@@ -43,19 +50,17 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId,
           className="w-full py-4 flex items-center justify-between px-4"
         >
           <span className="font-mono text-sm">Shader Controls</span>
-          <X
-            className="w-4 h-4 transition-transform duration-[300ms]"
-            style={{ transitionTimingFunction: "cubic-bezier(0.0, 0.0, 0.2, 1)" }}
-          />
+          <X className="w-4 h-4" />
         </button>
 
         {/* Content - always rendered but with opacity transition */}
         <div
-          className="overflow-y-auto h-[calc(100%-56px)] px-4 pb-4 space-y-6 transition-opacity duration-[150ms] flex flex-col"
+          className="overflow-y-auto h-[calc(100%-56px)] px-4 pb-4 space-y-6 transition-opacity flex flex-col"
           style={{
             opacity: open ? 1 : 0,
-            transitionTimingFunction: "cubic-bezier(0.4, 0.0, 1, 1)",
-            transitionDelay: open ? "50ms" : "0ms",
+            transitionDuration: contentDuration,
+            transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
+            transitionDelay: !prefersReducedMotion && open ? "50ms" : "0ms",
             pointerEvents: open ? "auto" : "none",
           }}
         >

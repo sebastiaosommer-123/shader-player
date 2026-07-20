@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { motion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 import type { CapturedImage } from "@/lib/types"
 import { playDigitalClick } from "@/lib/audio-feedback"
 
@@ -14,6 +14,7 @@ interface CaptureThumbnailsProps {
 
 export function CaptureThumbnails({ images, onClick, isCapturing = false, hiddenImageId }: CaptureThumbnailsProps) {
   const [isMobile, setIsMobile] = useState(false)
+  const prefersReducedMotion = useReducedMotion()
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768)
@@ -47,17 +48,16 @@ export function CaptureThumbnails({ images, onClick, isCapturing = false, hidden
       className={`fixed z-10 ${isMobile ? "top-4 left-1/2 -translate-x-1/2" : "bottom-4 left-6"}`}
     >
       <motion.div
-        layoutId={`gallery-container-${latestImage.id}`}
+        layoutId={prefersReducedMotion ? undefined : `gallery-container-${latestImage.id}`}
         onClick={handleThumbnailClick}
-        whileTap={{ scale: 0.97 }}
-        className="cursor-pointer relative group overflow-hidden"
+        className="cursor-pointer relative group overflow-hidden active:scale-[0.97] transition-transform duration-150 ease-out motion-reduce:transition-none"
         style={{
           width: thumbWidth,
           height: thumbHeight,
           borderRadius: 8,
           boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1)",
         }}
-        transition={{ type: "spring", stiffness: 400, damping: 35 }}
+        transition={prefersReducedMotion ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 35 }}
         aria-label="View latest capture"
         role="button"
       >
@@ -66,7 +66,7 @@ export function CaptureThumbnails({ images, onClick, isCapturing = false, hidden
           alt="Latest capture"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors duration-150 pointer-events-none" />
+        <div className="absolute inset-0 bg-white/0 group-hoverFine:bg-white/10 transition-colors duration-150 pointer-events-none" />
       </motion.div>
 
       {visibleImages.length > 1 && (

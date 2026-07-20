@@ -9,6 +9,7 @@ import { ColorPicker } from "./color-picker"
 import { ShaderSelector } from "./shader-selector"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { CreditsFooter } from "./credits-footer"
+import { useReducedMotion } from "framer-motion"
 
 interface FloatingControlsPanelProps {
   params: ShaderParams
@@ -55,6 +56,7 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
   const [position, setPosition] = useState({ x: 0, y: 24 })
   const [size, setSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT })
   const [expandedHeight, setExpandedHeight] = useState(DEFAULT_HEIGHT)
+  const prefersReducedMotion = useReducedMotion()
 
   useEffect(() => {
     const saved = loadState()
@@ -76,17 +78,7 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
 
   const shaderConfig = getShaderConfig(shaderId)
 
-  const COLLAPSE_DURATION = 220
-
   const handleCollapse = () => {
-    // Set transition directly on the DOM element before React's size update lands,
-    // so the browser sees a previous painted state to interpolate from.
-    const el = rndRef.current?.getSelfElement() as HTMLElement | null
-    if (el) {
-      el.style.transition = `height ${COLLAPSE_DURATION}ms cubic-bezier(0.23, 1, 0.32, 1)`
-      setTimeout(() => { el.style.transition = '' }, COLLAPSE_DURATION + 50)
-    }
-
     if (isCollapsed) {
       setIsCollapsed(false)
       setSize(prev => ({ ...prev, height: expandedHeight }))
@@ -97,6 +89,11 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
       saveState({ width: size.width, height: expandedHeight, isCollapsed: true })
     }
   }
+
+  let bodyTransition = isCollapsed
+    ? 'opacity 120ms ease-out'
+    : 'opacity 180ms ease-out 60ms'
+  if (prefersReducedMotion) bodyTransition = 'none'
 
   if (!mounted) return null
 
@@ -161,9 +158,7 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
             className="flex-1 overflow-hidden"
             style={{
               opacity: isCollapsed ? 0 : 1,
-              transition: isCollapsed
-                ? 'opacity 120ms ease-out'
-                : 'opacity 180ms ease-out 60ms',
+              transition: bodyTransition,
             }}
           >
             <div className="h-full overflow-y-auto">
