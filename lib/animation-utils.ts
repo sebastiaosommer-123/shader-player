@@ -50,7 +50,7 @@ export function calculateAnimationPositions(
     targetLeft = window.innerWidth / 2 - thumbWidth / 2
   } else {
     // Bottom-left position
-    targetTop = window.innerHeight - 22 - thumbHeight // bottom-4 = 16px
+    targetTop = window.innerHeight - 16 - thumbHeight // bottom-4 = 16px
     targetLeft = 24 // left-6 = 24px
   }
 
