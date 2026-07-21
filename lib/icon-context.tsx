@@ -50,6 +50,7 @@ import {
   Pencil,
   SkipForward,
   CornerDownRight,
+  SlidersHorizontal,
 } from "lucide-react";
 
 export interface IconComponentProps {
@@ -71,7 +72,8 @@ export type IconName =
   | "image" | "link" | "check" | "rotate-ccw"
   | "play" | "pause" | "pipette"
   | "home" | "message-circle" | "inbox"
-  | "pencil" | "skip-forward" | "corner-down-right";
+  | "pencil" | "skip-forward" | "corner-down-right"
+  | "sliders-horizontal";
 
 export const defaultIcons: Record<IconName, IconComponent> = {
   "chevron-right": ChevronRight,
@@ -121,6 +123,7 @@ export const defaultIcons: Record<IconName, IconComponent> = {
   "pencil": Pencil,
   "skip-forward": SkipForward,
   "corner-down-right": CornerDownRight,
+  "sliders-horizontal": SlidersHorizontal,
 };
 
 const IconContext = createContext<Record<IconName, IconComponent> | null>(null);

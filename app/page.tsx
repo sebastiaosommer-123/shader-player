@@ -120,6 +120,10 @@ export default function Home() {
         setParams={setParams}
         shaderId={shaderId}
         onShaderChange={handleShaderChange}
+        images={capturedImages}
+        onThumbnailClick={handleThumbnailClick}
+        isCapturing={!!captureAnimation}
+        hiddenImageId={deletingImageId}
       />
 
       <CaptureButton onCapture={handleCapture} />

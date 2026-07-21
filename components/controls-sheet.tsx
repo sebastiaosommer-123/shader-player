@@ -55,8 +55,9 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId,
 
         {/* Content - always rendered but with opacity transition */}
         <div
-          className="overflow-y-auto h-[calc(100%-56px)] px-4 pb-4 space-y-6 transition-opacity flex flex-col"
+          className="overflow-y-auto h-[calc(100%-56px)] px-4 space-y-6 transition-opacity flex flex-col"
           style={{
+            paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
             opacity: open ? 1 : 0,
             transitionDuration: contentDuration,
             transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",

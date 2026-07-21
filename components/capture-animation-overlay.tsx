@@ -56,18 +56,34 @@ export function CaptureAnimationOverlay({
   const translateY = targetRect.top - sourceRect.top + (targetRect.height - sourceRect.height) / 2
 
   const shouldTravel = isAnimating && !prefersReducedMotion
-  const targetRadius = 8
-  const animatedRadius = shouldTravel
-    ? targetRadius / Math.min(scaleX, scaleY)
-    : 0
+  // Whatever the thumbnail actually is — a rounded rect on desktop, a circle in
+  // the mobile bar — so the frame settles into its final shape rather than
+  // popping at the end.
+  const targetRadius = targetRect.radius ?? 8
+
+  // The image scales UNIFORMLY and the crop is done by an animated clip-path.
+  //
+  // Scaling non-uniformly to fit the target rect directly would squash a
+  // portrait canvas into a square thumbnail. Counter-scaling a nested element
+  // fixes the endpoints but not the middle: two linearly-interpolated scales
+  // multiply to a quadratic, so the aspect ratio still visibly wobbles in
+  // flight. A single uniform scale can't distort at any frame, so the crop has
+  // to come from somewhere else — clip-path, which also rounds the corners.
+  const coverScale = Math.max(scaleX, scaleY)
+  const insetX = Math.max(0, (sourceRect.width - targetRect.width / coverScale) / 2)
+  const insetY = Math.max(0, (sourceRect.height - targetRect.height / coverScale) / 2)
+
+  const animatedClip = shouldTravel
+    ? `inset(${insetY}px ${insetX}px round ${targetRadius / coverScale}px)`
+    : "inset(0px 0px round 0px)"
   const animatedTransform = shouldTravel
-    ? `translate3d(${translateX}px, ${translateY}px, 0) scale(${scaleX}, ${scaleY})`
+    ? `translate3d(${translateX}px, ${translateY}px, 0) scale(${coverScale})`
     : "translate3d(0, 0, 0) scale(1)"
   let transition = "none"
   if (isAnimating) {
     transition = prefersReducedMotion
       ? "opacity 150ms cubic-bezier(0.23, 1, 0.32, 1)"
-      : "transform 500ms cubic-bezier(0.32, 0.72, 0, 1), opacity 500ms cubic-bezier(0.32, 0.72, 0, 1), border-radius 500ms cubic-bezier(0.32, 0.72, 0, 1)"
+      : "transform 500ms cubic-bezier(0.32, 0.72, 0, 1), opacity 500ms cubic-bezier(0.32, 0.72, 0, 1), clip-path 500ms cubic-bezier(0.32, 0.72, 0, 1)"
   }
   let animatedOpacity = 1
   if (isAnimating) animatedOpacity = prefersReducedMotion ? 0 : 0.98
@@ -96,7 +112,8 @@ export function CaptureAnimationOverlay({
           width: Math.round(sourceRect.width),
           height: Math.round(sourceRect.height),
           transform: animatedTransform,
-          borderRadius: `${animatedRadius}px`,
+          clipPath: animatedClip,
+          WebkitClipPath: animatedClip,
           opacity: animatedOpacity,
           transition,
           boxShadow: isAnimating ? "0 10px 40px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.2)" : "none",
