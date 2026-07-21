@@ -64,8 +64,8 @@ export function calculateAnimationPositions(
 
   if (isMobile) {
     // Square, bottom-left, vertically centred in the 68px control bar.
-    thumbWidth = 56
-    thumbHeight = 56
+    thumbWidth = 44
+    thumbHeight = 44
     targetTop = window.innerHeight - 16 - 68 + (68 - thumbHeight) / 2
     targetLeft = 24 // px-6 = 24px
     targetRadius = 8

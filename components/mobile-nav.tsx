@@ -12,7 +12,7 @@ import { useIcon } from "@/lib/icon-context"
 
 /** Matches the iOS camera proportions: shutter ring, square thumb, round control. */
 const CAPTURE_SIZE = 68
-const THUMBNAIL_SIZE = 56
+const THUMBNAIL_SIZE = 44
 const FILTERS_SIZE = 44
 
 interface MobileNavProps {
