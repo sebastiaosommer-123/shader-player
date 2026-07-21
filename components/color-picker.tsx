@@ -1,24 +1,33 @@
 "use client"
 
+import { ColorPickerPopover } from "@/components/ui/color-picker"
+
 interface ColorPickerProps {
-  label: string
+  label?: string
   value: string
   onChange: (value: string) => void
 }
 
 export function ColorPicker({ label, value, onChange }: ColorPickerProps) {
+  const picker = (
+    <ColorPickerPopover
+      value={value}
+      onValueChange={(nextValue) => onChange(nextValue)}
+      defaultFormat="hex"
+      triggerShowValue
+      triggerClassName="gap-1.5 rounded-lg"
+      // Unlabeled swatches sit in a wrapping row, so they size to their content
+      // instead of claiming the full width and forcing one per line.
+      wrapperClassName={label ? undefined : "w-auto"}
+    />
+  )
+
+  if (!label) return picker
+
   return (
-    <div className="flex items-center gap-4 py-1">
-      <div className="shrink-0 text-white text-white text-sm w-[106px]">{label}</div>
-      <div className="flex-1 flex items-center gap-2 justify-end">
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="rounded-full cursor-pointer border border-border bg-transparent overflow-hidden [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded-full [&::-moz-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-full h-7 w-7"
-        />
-        <div className="font-medium w-16 tabular-nums text-sm text-muted-foreground">{value.toUpperCase()}</div>
-      </div>
+    <div className="flex items-center gap-3">
+      <span className="shrink-0 text-[13px] text-muted-foreground select-none">{label}</span>
+      <div className="flex-1 min-w-0">{picker}</div>
     </div>
   )
 }

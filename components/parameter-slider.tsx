@@ -1,7 +1,7 @@
 "use client"
 
-import { Slider } from "@/components/ui/slider"
-import { useState, useEffect, useRef } from "react"
+import { SliderComfortable } from "@/components/ui/slider"
+import { useEffect, useRef } from "react"
 import { startSliderSound, updateSliderSound, stopSliderSound } from "@/lib/slider-audio"
 
 interface ParameterSliderProps {
@@ -14,47 +14,34 @@ interface ParameterSliderProps {
 }
 
 export function ParameterSlider({ label, value, min, max, step, onChange }: ParameterSliderProps) {
-  const [isDragging, setIsDragging] = useState(false)
+  const isDraggingRef = useRef(false)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handleValueChange = (values: number[]) => {
-    const newValue = values[0]
+  const handleValueChange = (newValue: number) => {
     onChange(newValue)
 
-    if (isDragging) {
+    if (isDraggingRef.current) {
       const normalizedValue = (newValue - min) / (max - min)
       updateSliderSound(normalizedValue)
     }
   }
 
   const handlePointerDown = () => {
-    setIsDragging(true)
+    isDraggingRef.current = true
     const normalizedValue = (value - min) / (max - min)
     startSliderSound(normalizedValue)
 
     timeoutRef.current = setTimeout(() => {
-      if (isDragging) {
-        setIsDragging(false)
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false
         stopSliderSound()
       }
     }, 10000)
   }
 
   const handlePointerUp = () => {
-    if (isDragging) {
-      setIsDragging(false)
-      stopSliderSound()
-
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
-      }
-    }
-  }
-
-  const handlePointerLeave = () => {
-    if (isDragging) {
-      setIsDragging(false)
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false
       stopSliderSound()
 
       if (timeoutRef.current) {
@@ -69,28 +56,28 @@ export function ParameterSlider({ label, value, min, max, step, onChange }: Para
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
       }
-      if (isDragging) {
+      if (isDraggingRef.current) {
         stopSliderSound()
       }
     }
-  }, [isDragging])
+  }, [])
 
   return (
-    <div className="py-2 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="text-foreground text-sm">{label}</div>
-        <div className="font-medium tabular-nums text-muted-foreground text-sm">{value.toFixed(3)}</div>
-      </div>
-      <Slider
-        value={[value]}
-        onValueChange={handleValueChange}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerLeave}
+    <div
+      onPointerDownCapture={handlePointerDown}
+      onPointerUpCapture={handlePointerUp}
+      onPointerCancelCapture={handlePointerUp}
+    >
+      <SliderComfortable
+        value={value}
+        onChange={handleValueChange}
         min={min}
         max={max}
         step={step}
-        className="w-full"
+        variant="scrubber"
+        label={label}
+        formatValue={(currentValue) => currentValue.toFixed(3)}
+        className="w-full rounded-[8px]"
       />
     </div>
   )

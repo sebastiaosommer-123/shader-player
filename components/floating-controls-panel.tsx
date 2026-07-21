@@ -4,8 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Rnd } from "react-rnd"
 import { Plus, Minus } from "lucide-react"
 import type { ShaderParams } from "@/lib/shader-uniforms"
-import { ParameterSlider } from "./parameter-slider"
-import { ColorPicker } from "./color-picker"
+import { ParameterGroup } from "./parameter-group"
 import { ShaderSelector } from "./shader-selector"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { CreditsFooter } from "./credits-footer"
@@ -166,34 +165,13 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
                 <ShaderSelector currentShaderId={shaderId} onShaderChange={onShaderChange} />
 
                 {shaderConfig.parameterGroups.map((group) => (
-                  <div key={group.name} className="space-y-1">
-                    <h3 className="uppercase tracking-wider text-muted-foreground text-sm">{group.name}</h3>
-                    {group.parameters.map((param) => {
-                      if (param.type === "slider") {
-                        return (
-                          <ParameterSlider
-                            key={param.key}
-                            label={param.label}
-                            value={params[param.key] as number}
-                            min={param.min!}
-                            max={param.max!}
-                            step={param.step!}
-                            onChange={(v) => updateParam(param.key, v)}
-                          />
-                        )
-                      } else if (param.type === "color") {
-                        return (
-                          <ColorPicker
-                            key={param.key}
-                            label={param.label}
-                            value={params[param.key] as string}
-                            onChange={(v) => updateParam(param.key, v)}
-                          />
-                        )
-                      }
-                      return null
-                    })}
-                  </div>
+                  <ParameterGroup
+                    key={group.name}
+                    group={group}
+                    params={params}
+                    onChange={updateParam}
+                    spacing="compact"
+                  />
                 ))}
 
                 <CreditsFooter />

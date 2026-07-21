@@ -1,17 +1,29 @@
 // Shader configuration system for extensible shader management
 
-export interface ShaderParameter {
-  key: string
-  label: string
-  type: "slider" | "color"
-  min?: number
-  max?: number
-  step?: number
-}
+export type ShaderParameter =
+  | {
+      key: string
+      label: string
+      type: "slider"
+      min: number
+      max: number
+      step: number
+    }
+  | {
+      key: string
+      // Optional: a swatch whose position in the group already identifies it
+      // needs no "Color 1" beside it. Roles that carry meaning (Fill, Stroke)
+      // still label themselves.
+      label?: string
+      type: "color"
+    }
 
 export interface ShaderParameterGroup {
   name: string
   parameters: ShaderParameter[]
+  // "wrap" lays the controls out in a horizontal run that wraps, which suits
+  // compact unlabeled swatches. Defaults to one control per row.
+  layout?: "stack" | "wrap"
 }
 
 export interface ShaderConfig {
@@ -478,11 +490,12 @@ export const SHADER_CONFIGS: Record<string, ShaderConfig> = {
       },
       {
         name: "Color Palette",
+        layout: "wrap",
         parameters: [
-          { key: "color1", label: "Color 1", type: "color" },
-          { key: "color2", label: "Color 2", type: "color" },
-          { key: "color3", label: "Color 3", type: "color" },
-          { key: "color4", label: "Color 4", type: "color" },
+          { key: "color1", type: "color" },
+          { key: "color2", type: "color" },
+          { key: "color3", type: "color" },
+          { key: "color4", type: "color" },
         ],
       },
     ],
@@ -519,12 +532,13 @@ export const SHADER_CONFIGS: Record<string, ShaderConfig> = {
       },
       {
         name: "Color Palette",
+        layout: "wrap",
         parameters: [
-          { key: "color1", label: "Color 1", type: "color" },
-          { key: "color2", label: "Color 2", type: "color" },
-          { key: "color3", label: "Color 3", type: "color" },
-          { key: "color4", label: "Color 4", type: "color" },
-          { key: "color5", label: "Color 5", type: "color" },
+          { key: "color1", type: "color" },
+          { key: "color2", type: "color" },
+          { key: "color3", type: "color" },
+          { key: "color4", type: "color" },
+          { key: "color5", type: "color" },
         ],
       },
     ],

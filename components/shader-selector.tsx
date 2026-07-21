@@ -1,11 +1,15 @@
 "use client"
 
-import { Check, ChevronDown } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { useState } from "react"
 import { getAllShaderIds, getShaderConfig } from "@/lib/shader-configs"
 import { playDigitalClick } from "@/lib/audio-feedback"
-import { cn } from "@/lib/utils"
-import { useReducedMotion } from "framer-motion"
+import {
+  DropdownContent,
+  DropdownMenu,
+  DropdownTrigger,
+} from "@/components/ui/dropdown"
+import { MenuItem } from "@/components/ui/menu-item"
 
 interface ShaderSelectorProps {
   currentShaderId: string
@@ -14,15 +18,13 @@ interface ShaderSelectorProps {
 
 export function ShaderSelector({ currentShaderId, onShaderChange }: ShaderSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const prefersReducedMotion = useReducedMotion()
-  let transitionDuration = isOpen ? '150ms' : '120ms'
-  if (prefersReducedMotion) transitionDuration = '0ms'
   const shaderIds = getAllShaderIds()
   const currentShader = getShaderConfig(currentShaderId)
+  const selectedIndex = shaderIds.indexOf(currentShaderId)
 
-  const handleToggle = async () => {
-    await playDigitalClick("weak")
-    setIsOpen(!isOpen)
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen && !isOpen) void playDigitalClick("weak")
+    setIsOpen(nextOpen)
   }
 
   const handleSelect = async (shaderId: string) => {
@@ -32,51 +34,32 @@ export function ShaderSelector({ currentShaderId, onShaderChange }: ShaderSelect
   }
 
   return (
-    <div className="relative">
-      <button
-        onClick={handleToggle}
-        className="w-full flex items-center justify-between px-3 py-2 bg-muted/50 hoverFine:bg-muted/70 transition-colors text-sm text-foreground border border-border"
-        style={{ borderRadius: '8px' }}
-      >
-        <span className="font-normal">{currentShader.name}</span>
-        <ChevronDown
-          className="w-4 h-4 transition-transform"
-          style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-        />
-      </button>
-
-      <div
-        className="fixed inset-0 z-10"
-        style={{ pointerEvents: isOpen ? 'auto' : 'none' }}
-        onClick={() => setIsOpen(false)}
+    <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
+      <DropdownTrigger
+        render={
+          <button className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-muted/50 px-3 text-sm text-foreground transition-colors duration-150 hoverFine:bg-muted/70">
+            <span className="font-normal">{currentShader.name}</span>
+            <ChevronDown
+              className="size-4 transition-transform duration-150 motion-reduce:transition-none"
+              style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+            />
+          </button>
+        }
       />
-      <div
-        className={cn(
-          "absolute top-full left-0 right-0 mt-1 bg-popover border border-border shadow-lg overflow-hidden z-20",
-          "transition-[opacity,transform] origin-top",
-          isOpen ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-95 pointer-events-none"
-        )}
-        style={{
-          borderRadius: '8px',
-          transitionDuration,
-          transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)',
-        }}
-      >
-        {shaderIds.map((shaderId) => {
+      <DropdownContent checkedIndex={selectedIndex} className="w-[248px] rounded-xl">
+        {shaderIds.map((shaderId, index) => {
           const shader = getShaderConfig(shaderId)
-          const isSelected = shaderId === currentShaderId
           return (
-            <button
+            <MenuItem
               key={shaderId}
-              onClick={() => handleSelect(shaderId)}
-              className="w-full flex items-center justify-between px-3 py-2 text-sm hoverFine:bg-muted/50 transition-colors text-left"
-            >
-              <span>{shader.name}</span>
-              {isSelected && <Check className="w-4 h-4" />}
-            </button>
+              index={index}
+              label={shader.name}
+              checked={shaderId === currentShaderId}
+              onSelect={() => handleSelect(shaderId)}
+            />
           )
         })}
-      </div>
-    </div>
+      </DropdownContent>
+    </DropdownMenu>
   )
 }

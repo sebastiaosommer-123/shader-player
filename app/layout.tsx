@@ -2,6 +2,7 @@ import type React from "react"
 import { Space_Mono } from "next/font/google"
 import "./globals.css"
 import { AudioInitializer } from "@/components/audio-initializer"
+import { ThemeProvider } from "@/components/theme-provider"
 
 const spaceMono = Space_Mono({
   weight: ["400", "700"],
@@ -26,10 +27,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body className={spaceMono.variable}>
-        <AudioInitializer />
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AudioInitializer />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   )

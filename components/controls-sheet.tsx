@@ -1,13 +1,13 @@
 "use client"
 import type { ShaderParams } from "@/lib/shader-uniforms"
-import { ParameterSlider } from "./parameter-slider"
-import { ColorPicker } from "./color-picker"
+import { ParameterGroup } from "./parameter-group"
 import { ShaderSelector } from "./shader-selector"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { X } from "lucide-react"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { CreditsFooter } from "./credits-footer"
 import { useReducedMotion } from "framer-motion"
+import { AppearanceControl } from "./appearance-control"
 
 interface ControlsSheetProps {
   params: ShaderParams
@@ -35,7 +35,7 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId,
   return (
     <>
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 bg-black text-white rounded-t-2xl border-t border-white/10 h-[400px] sm:h-[80vh] transition-transform"
+        className="fixed bottom-0 left-0 right-0 z-50 bg-background text-foreground rounded-t-2xl border-t border-border h-[400px] sm:h-[80vh] transition-transform"
         style={{
           transform: open ? "translateY(0)" : "translateY(100%)",
           transitionDuration: sheetDuration,
@@ -69,37 +69,13 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId,
           </div>
 
           {shaderConfig.parameterGroups.map((group) => (
-            <div key={group.name} className="space-y-3">
-              <h3 className="uppercase tracking-wider text-muted-foreground text-sm">{group.name}</h3>
-              {group.parameters.map((param) => {
-                if (param.type === "slider") {
-                  return (
-                    <ParameterSlider
-                      key={param.key}
-                      label={param.label}
-                      value={params[param.key] as number}
-                      min={param.min!}
-                      max={param.max!}
-                      step={param.step!}
-                      onChange={(v) => updateParam(param.key, v)}
-                    />
-                  )
-                } else if (param.type === "color") {
-                  return (
-                    <ColorPicker
-                      key={param.key}
-                      label={param.label}
-                      value={params[param.key] as string}
-                      onChange={(v) => updateParam(param.key, v)}
-                    />
-                  )
-                }
-                return null
-              })}
-            </div>
+            <ParameterGroup key={group.name} group={group} params={params} onChange={updateParam} />
           ))}
 
-          <CreditsFooter />
+          <div className="mt-auto space-y-4">
+            <AppearanceControl />
+            <CreditsFooter />
+          </div>
         </div>
       </div>
     </>

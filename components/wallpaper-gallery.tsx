@@ -301,7 +301,7 @@ export function WallpaperGallery({
                 </Button>
                 <Button
                   onClick={(e) => { e.stopPropagation(); handleDownload() }}
-                  className="pointer-events-auto cursor-pointer !pl-4 !pr-5 rounded-full text-white bg-background h-11 text-sm hoverFine:bg-zinc-800 active:scale-[0.97] transition-[background-color,transform] duration-150 font-medium"
+                  className="pointer-events-auto cursor-pointer !pl-4 !pr-5 rounded-full text-foreground bg-background h-11 text-sm hoverFine:bg-accent active:scale-[0.97] transition-[background-color,transform] duration-150 font-medium"
                   style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
                 >
                   <Download className="h-5 w-5" />

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Camera, ChevronRightIcon } from 'lucide-react'
+import { ChevronRightIcon } from 'lucide-react'
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import { ControlsSheet } from "./controls-sheet"
 import { playDigitalClick } from "@/lib/audio-feedback"
@@ -29,7 +29,7 @@ export function MobileNav({ onCapture, params, setParams, shaderId, onShaderChan
             playDigitalClick("strong")
             setSheetOpen(true)
           }}
-          className="flex-1 text-white px-5 border border-white/10 flex items-center gap-2 font-mono text-sm transition-[opacity,transform] whitespace-nowrap justify-between rounded-full hoverFine:bg-zinc-800 active:scale-[0.97] bg-background h-11 pr-4"
+          className="flex-1 text-foreground px-5 border border-border flex items-center gap-2 font-mono text-sm transition-[opacity,transform] whitespace-nowrap justify-between rounded-full hoverFine:bg-accent active:scale-[0.97] bg-background h-11 pr-4 shadow-lg"
           style={{
             opacity: sheetOpen ? 0 : 1,
             transform: hiddenTransform,
@@ -48,7 +48,7 @@ export function MobileNav({ onCapture, params, setParams, shaderId, onShaderChan
             playDigitalClick("strong")
             onCapture()
           }}
-          className="flex items-center justify-center rounded-full hoverFine:bg-zinc-800 text-white transition-[background-color,transform,opacity] active:scale-[0.97] border border-white/10 bg-background size-11"
+          className="group flex size-11 items-center justify-center rounded-full border-2 border-background bg-transparent p-[3px] shadow-none transition-[opacity,transform] hoverFine:bg-transparent"
           aria-label="Capture frame"
           style={{
             opacity: sheetOpen ? 0 : 1,
@@ -58,7 +58,7 @@ export function MobileNav({ onCapture, params, setParams, shaderId, onShaderChan
             transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
           }}
         >
-          <Camera className="size-[18px]" />
+          <span className="size-[34px] rounded-full bg-background transition-transform duration-100 ease-out group-active:scale-90 motion-reduce:transition-none" />
         </button>
       </div>
 

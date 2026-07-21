@@ -1,6 +1,5 @@
 "use client"
 
-import { Camera } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { playDigitalClick } from "@/lib/audio-feedback"
 
@@ -18,10 +17,10 @@ export function CaptureButton({ onCapture }: CaptureButtonProps) {
     <Button
       onClick={handleCapture}
       size="icon"
-      className="hidden md:flex fixed bottom-6 right-[304px] h-14 w-14 rounded-full shadow-lg z-10 hoverFine:bg-zinc-800 text-white transition-[background,transform] duration-150 active:scale-[0.97] bg-background cursor-pointer"
+      className="group hidden md:flex fixed bottom-6 right-[304px] size-14 rounded-full border-2 border-background bg-transparent p-1 shadow-none z-10 hoverFine:bg-transparent cursor-pointer"
       aria-label="Capture frame"
     >
-      <Camera className="h-6 w-6" />
+      <span className="size-11 rounded-full bg-background transition-transform duration-100 ease-out group-active:scale-90 motion-reduce:transition-none" />
     </Button>
   )
 }
