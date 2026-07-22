@@ -28,3 +28,6 @@ next-env.d.ts
 
 # brainstorming artifacts
 .superpowers/
+
+# macOS
+.DS_Store
