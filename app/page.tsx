@@ -98,7 +98,15 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col md:flex-row overflow-hidden">
+    // h-screen (100vh) is the *large* viewport on iOS: it ignores Safari's
+    // toolbar, so the control bar ends up underneath it. 100dvh tracks the
+    // viewport that is actually visible. Kept as an inline override rather than
+    // a class swap so browsers without dvh drop the declaration and fall back
+    // to h-screen instead of collapsing.
+    <div
+      className="h-screen w-screen flex flex-col md:flex-row overflow-hidden"
+      style={{ height: "100dvh" }}
+    >
       {/* Shader Canvas.
           Two elements on purpose: the rounded corners reveal whatever is painted
           *behind* the clipped wrapper, so the surround carries the colour. `dark`
