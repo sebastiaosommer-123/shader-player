@@ -99,9 +99,18 @@ export default function Home() {
 
   return (
     <div className="h-screen w-screen flex flex-col md:flex-row overflow-hidden">
-      {/* Shader Canvas */}
-      <div className="flex-1 relative">
-        <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} isPaused={isGalleryOpen} />
+      {/* Shader Canvas.
+          Two elements on purpose: the rounded corners reveal whatever is painted
+          *behind* the clipped wrapper, so the surround carries the colour. `dark`
+          scopes the dark palette here alone — it cannot go on the outer flex
+          container without dragging the desktop sidebar into it too. Transparent
+          from md up, where the canvas is square and fills its box. */}
+      <div className="dark flex-1 min-h-0 bg-background md:bg-transparent">
+        {/* overflow-hidden is what actually clips the canvas: the radius sits on
+            this wrapper, not on the <canvas> itself. */}
+        <div className="relative h-full w-full overflow-hidden rounded-[12px] md:rounded-none">
+          <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} isPaused={isGalleryOpen} />
+        </div>
       </div>
 
       {/* Desktop Sidebar */}

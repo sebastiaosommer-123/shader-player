@@ -43,7 +43,6 @@ export function CaptureThumbnails({ images, onClick, isCapturing = false, hidden
         image={latestImage}
         width={MAX_HEIGHT * aspectRatio}
         height={MAX_HEIGHT}
-        count={visibleImages.length}
         onClick={handleClick}
       />
     </div>

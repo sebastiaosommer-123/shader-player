@@ -65,72 +65,80 @@ export function MobileNav({
 
   return (
     <>
+      {/* An opaque strip in the normal flow, so the shader ends where the
+          controls begin rather than running underneath them.
+          `dark` scopes the dark palette to this subtree regardless of the page
+          theme (the variant is `&:is(.dark *)`), so the chrome mattes the
+          artwork like a gallery wall instead of competing with it — and the
+          controls below stay on semantic tokens rather than hardcoded colours. */}
       <div
-        className="md:hidden fixed inset-x-0 z-40 flex items-center justify-between px-6"
-        style={{
-          bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
-          height: CAPTURE_SIZE,
-        }}
+        className="dark md:hidden shrink-0 bg-background px-6 pt-4"
+        style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
       >
-        {/* Left slot. The placeholder always occupies the thumbnail's exact
-            footprint so the capture animation has a target to fly to even on
-            the very first capture, when no thumbnail exists yet. */}
-        <div
-          className="transition-[opacity,transform]"
-          style={hideWhileSheetOpen(180)}
-        >
-          {showThumbnail ? (
-            <CaptureThumbnail
-              image={latestImage}
-              width={THUMBNAIL_SIZE}
-              height={THUMBNAIL_SIZE}
-              count={visibleImages.length}
-              onClick={handleThumbnailClick}
-            />
-          ) : (
-            // Only on mobile: the bar is merely CSS-hidden at wider widths, so
-            // an unconditional placeholder would still be in the DOM on desktop
-            // and would win the capture-target lookup with a 0x0 rect.
-            isMobile && (
-              <div
-                data-capture-target
-                aria-hidden
-                className="pointer-events-none opacity-0"
-                style={{
-                  width: THUMBNAIL_SIZE,
-                  height: THUMBNAIL_SIZE,
-                  borderRadius: THUMBNAIL_RADIUS,
-                }}
+        <div className="relative flex items-center justify-between" style={{ height: CAPTURE_SIZE }}>
+          {/* Left slot. The placeholder always occupies the thumbnail's exact
+              footprint so the capture animation has a target to fly to even on
+              the very first capture, when no thumbnail exists yet. */}
+          <div
+            className="transition-[opacity,transform]"
+            style={hideWhileSheetOpen(180)}
+          >
+            {showThumbnail ? (
+              <CaptureThumbnail
+                image={latestImage}
+                width={THUMBNAIL_SIZE}
+                height={THUMBNAIL_SIZE}
+                onClick={handleThumbnailClick}
+                elevated={false}
               />
-            )
-          )}
+            ) : (
+              // Only on mobile: the bar is merely CSS-hidden at wider widths, so
+              // an unconditional placeholder would still be in the DOM on desktop
+              // and would win the capture-target lookup with a 0x0 rect.
+              isMobile && (
+                <div
+                  data-capture-target
+                  aria-hidden
+                  className="pointer-events-none opacity-0"
+                  style={{
+                    width: THUMBNAIL_SIZE,
+                    height: THUMBNAIL_SIZE,
+                    borderRadius: THUMBNAIL_RADIUS,
+                  }}
+                />
+              )
+            )}
+          </div>
+
+          {/* Capture. Absolutely centered so the variable-width left slot can
+              never pull the shutter off the screen's centre line. */}
+          <button
+            onClick={() => {
+              playDigitalClick("strong")
+              onCapture()
+            }}
+            // Ring deliberately heavier than the gap it encloses: at low contrast
+            // a thin ring plus a wide gap reads as two concentric shapes rather
+            // than one shutter.
+            className="group absolute left-1/2 -translate-x-1/2 flex items-center justify-center rounded-full border-4 border-foreground bg-transparent p-[2px] shadow-none transition-[opacity,transform] hoverFine:bg-transparent"
+            aria-label="Capture frame"
+            style={{ ...hideWhileSheetOpen(150), width: CAPTURE_SIZE, height: CAPTURE_SIZE }}
+          >
+            <span className="size-full rounded-full bg-foreground transition-transform duration-100 ease-out group-active:scale-90 motion-reduce:transition-none" />
+          </button>
+
+          <button
+            onClick={() => {
+              playDigitalClick("strong")
+              setSheetOpen(true)
+            }}
+            className="flex items-center justify-center rounded-full text-muted-foreground transition-[opacity,transform] active:scale-[0.97]"
+            aria-label="Shader controls"
+            style={{ ...hideWhileSheetOpen(180), width: FILTERS_SIZE, height: FILTERS_SIZE }}
+          >
+            <SlidersIcon size={24} strokeWidth={2} />
+          </button>
         </div>
-
-        {/* Capture. Absolutely centered so the variable-width left slot can
-            never pull the shutter off the screen's centre line. */}
-        <button
-          onClick={() => {
-            playDigitalClick("strong")
-            onCapture()
-          }}
-          className="group absolute left-1/2 -translate-x-1/2 flex items-center justify-center rounded-full border-2 border-background bg-transparent p-1 shadow-none transition-[opacity,transform] hoverFine:bg-transparent"
-          aria-label="Capture frame"
-          style={{ ...hideWhileSheetOpen(150), width: CAPTURE_SIZE, height: CAPTURE_SIZE }}
-        >
-          <span className="size-full rounded-full bg-background transition-transform duration-100 ease-out group-active:scale-90 motion-reduce:transition-none" />
-        </button>
-
-        <button
-          onClick={() => {
-            playDigitalClick("strong")
-            setSheetOpen(true)
-          }}
-          className="flex items-center justify-center rounded-full border border-border bg-background text-foreground shadow-lg transition-[opacity,transform] hoverFine:bg-accent active:scale-[0.97]"
-          aria-label="Shader controls"
-          style={{ ...hideWhileSheetOpen(180), width: FILTERS_SIZE, height: FILTERS_SIZE }}
-        >
-          <SlidersIcon size={20} />
-        </button>
       </div>
 
       <ControlsSheet

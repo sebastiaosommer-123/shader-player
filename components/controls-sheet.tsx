@@ -7,7 +7,6 @@ import { X } from "lucide-react"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { CreditsFooter } from "./credits-footer"
 import { useReducedMotion } from "framer-motion"
-import { AppearanceControl } from "./appearance-control"
 
 interface ControlsSheetProps {
   params: ShaderParams
@@ -35,7 +34,9 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId,
   return (
     <>
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 bg-background text-foreground rounded-t-2xl border-t border-border h-[400px] sm:h-[80vh] transition-transform"
+        // `dark` matches the mobile control bar: this sheet only ever opens on
+        // mobile, so it stays on the dark palette whatever the page theme is.
+        className="dark fixed bottom-0 left-0 right-0 z-50 bg-background text-foreground rounded-t-2xl border-t border-border h-[400px] sm:h-[80vh] transition-transform"
         style={{
           transform: open ? "translateY(0)" : "translateY(100%)",
           transitionDuration: sheetDuration,
@@ -73,8 +74,10 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId,
             <ParameterGroup key={group.name} group={group} params={params} onChange={updateParam} />
           ))}
 
+          {/* No appearance control here: mobile chrome is always dark, so the
+              toggle would sit in the sheet changing nothing visible. Light/dark
+              is a desktop choice — the sidebar keeps its copy. */}
           <div className="mt-auto space-y-4">
-            <AppearanceControl />
             <CreditsFooter />
           </div>
         </div>
