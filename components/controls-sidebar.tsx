@@ -60,7 +60,13 @@ export function ControlsSidebar({
           <ShaderSelector currentShaderId={shaderId} onShaderChange={onShaderChange} />
 
           {shaderConfig.parameterGroups.map((group) => (
-            <ParameterGroup key={group.name} group={group} params={params} onChange={updateParam} />
+            <ParameterGroup
+              key={group.name}
+              group={group}
+              params={params}
+              onChange={updateParam}
+              shaderId={shaderId}
+            />
           ))}
 
           <div className="mt-auto space-y-4">

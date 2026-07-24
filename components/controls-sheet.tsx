@@ -71,7 +71,13 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId,
           </div>
 
           {shaderConfig.parameterGroups.map((group) => (
-            <ParameterGroup key={group.name} group={group} params={params} onChange={updateParam} />
+            <ParameterGroup
+              key={group.name}
+              group={group}
+              params={params}
+              onChange={updateParam}
+              shaderId={shaderId}
+            />
           ))}
 
           {/* No appearance control here: mobile chrome is always dark, so the

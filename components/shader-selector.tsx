@@ -36,10 +36,9 @@ export function ShaderSelector({ currentShaderId, onShaderChange }: ShaderSelect
   return (
     <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
       <DropdownTrigger
-        // Same height as the parameter rows so the column keeps one rhythm —
-        // h-9 on mobile, where this renders inside the touch sheet.
+        // Same height as the parameter rows so the column keeps one rhythm.
         render={
-          <button className="flex h-9 md:h-8 w-full items-center justify-between rounded-lg border border-border bg-muted/50 px-3 text-sm text-foreground transition-colors duration-150 hoverFine:bg-muted/70">
+          <button className="flex h-9 w-full items-center justify-between rounded-lg border border-border bg-muted/50 px-3 text-sm text-foreground transition-colors duration-150 hoverFine:bg-muted/70">
             <span className="font-normal">{currentShader.name}</span>
             <ChevronDown
               className="size-4 transition-transform duration-150 motion-reduce:transition-none"

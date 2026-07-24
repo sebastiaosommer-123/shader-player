@@ -170,6 +170,7 @@ export function FloatingControlsPanel({ params, setParams, shaderId, onShaderCha
                     group={group}
                     params={params}
                     onChange={updateParam}
+                    shaderId={shaderId}
                     spacing="compact"
                   />
                 ))}

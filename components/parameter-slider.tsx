@@ -77,7 +77,9 @@ export function ParameterSlider({ label, value, min, max, step, onChange }: Para
         variant="scrubber"
         label={label}
         formatValue={(currentValue) => currentValue.toFixed(3)}
-        className="w-full rounded-[8px]"
+        // 36px on desktop to match the shader dropdown; the mobile sheet keeps
+        // SliderComfortable's own 32px.
+        className="w-full md:h-9 rounded-[8px]"
       />
     </div>
   )
