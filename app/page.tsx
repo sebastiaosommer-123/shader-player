@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, type CSSProperties } from "react"
 import { AnimatePresence } from "framer-motion"
 import { ShaderCanvas, type ShaderCanvasRef } from "@/components/shader-canvas"
 import { ControlsSidebar } from "@/components/controls-sidebar"
@@ -15,9 +15,11 @@ import { CaptureAnimationOverlay } from "@/components/capture-animation-overlay"
 import { calculateAnimationPositions } from "@/lib/animation-utils"
 import type { Rect } from "@/lib/animation-utils"
 import { getShaderConfig } from "@/lib/shader-configs"
+import { useResizableSidebar } from "@/hooks/use-resizable-sidebar"
 
 export default function Home() {
   const [shaderId, setShaderId] = useState<string>("terracotta")
+  const { width: sidebarWidth, isResizing, startResize } = useResizableSidebar()
   const [params, setParams] = useState<ShaderParams>(getShaderConfig("terracotta").defaultParams)
 
   const [capturedImages, setCapturedImages] = useState<CapturedImage[]>([])
@@ -103,9 +105,13 @@ export default function Home() {
     // viewport that is actually visible. Kept as an inline override rather than
     // a class swap so browsers without dvh drop the declaration and fall back
     // to h-screen instead of collapsing.
+    //
+    // --sidebar-width is published here so the sidebar and anything that has to
+    // line up with it (the capture button) read one value; the canvas just takes
+    // whatever flex-1 leaves over.
     <div
       className="h-screen w-screen flex flex-col md:flex-row overflow-hidden"
-      style={{ height: "100dvh" }}
+      style={{ height: "100dvh", "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
     >
       {/* Shader Canvas.
           Two elements on purpose: the rounded corners reveal whatever is painted
@@ -128,6 +134,8 @@ export default function Home() {
           setParams={setParams}
           shaderId={shaderId}
           onShaderChange={handleShaderChange}
+          onResizeStart={startResize}
+          isResizing={isResizing}
         />
       </div>
 

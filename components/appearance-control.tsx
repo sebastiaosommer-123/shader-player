@@ -33,7 +33,9 @@ export function AppearanceControl() {
                 aria-checked={isSelected}
                 onClick={() => setTheme(option)}
                 className={cn(
-                  "h-8 rounded-md px-2 text-xs capitalize text-muted-foreground transition-[background-color,color,box-shadow,transform] duration-150 ease-out hoverFine:text-foreground active:scale-[0.98] motion-reduce:transition-none",
+                  // 6px, not rounded-md: the shell is 10px with 4px of padding,
+                  // so the cells have to sit 4px tighter to stay concentric.
+                  "h-8 rounded-[6px] px-2 text-xs capitalize text-muted-foreground transition-[background-color,color,box-shadow,transform] duration-150 ease-out hoverFine:text-foreground active:scale-[0.98] motion-reduce:transition-none",
                   isSelected && "bg-background text-foreground shadow-sm",
                 )}
               >

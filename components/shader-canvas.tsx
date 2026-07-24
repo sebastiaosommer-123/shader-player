@@ -79,6 +79,25 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
     glRef.current = gl
     programRef.current = initShader(gl, shaderId)
 
+    const startTime = Date.now()
+
+    // Elapsed shader time, frozen at the moment of pausing so a redraw while
+    // paused reproduces the same frame rather than jumping forward.
+    const elapsed = () => {
+      const now = pausedAtRef.current ?? Date.now()
+      return (now - startTime - totalPausedTimeRef.current) / 1000
+    }
+
+    const drawFrame = () => {
+      if (!gl || !programRef.current) return
+
+      updateUniforms(gl, programRef.current, paramsRef.current, elapsed(), canvas.width, canvas.height, shaderIdRef.current)
+
+      gl.clearColor(0, 0, 0, 1)
+      gl.clear(gl.COLOR_BUFFER_BIT)
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+    }
+
     const resize = () => {
       const dpr = window.devicePixelRatio || 1
       const rect = canvas.getBoundingClientRect()
@@ -87,6 +106,12 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
       canvas.height = rect.height * dpr
 
       gl.viewport(0, 0, canvas.width, canvas.height)
+
+      // Resizing the drawing buffer wipes it, and ResizeObserver callbacks run
+      // *after* this frame's requestAnimationFrame — so without an immediate
+      // redraw the browser paints one empty (black) frame for every step of a
+      // sidebar drag, which reads as flicker.
+      drawFrame()
     }
 
     const resizeObserver = new ResizeObserver(() => {
@@ -98,20 +123,13 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
 
     window.addEventListener("resize", resize)
 
-    const startTime = Date.now()
-
     const render = () => {
       if (!gl || !programRef.current || isPausedRef.current) {
         isLoopRunningRef.current = false
         return
       }
 
-      const time = (Date.now() - startTime - totalPausedTimeRef.current) / 1000
-      updateUniforms(gl, programRef.current, paramsRef.current, time, canvas.width, canvas.height, shaderIdRef.current)
-
-      gl.clearColor(0, 0, 0, 1)
-      gl.clear(gl.COLOR_BUFFER_BIT)
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+      drawFrame()
 
       animationRef.current = requestAnimationFrame(render)
     }
