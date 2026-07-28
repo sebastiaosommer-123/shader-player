@@ -17,17 +17,16 @@ export function CaptureButton({ onCapture }: CaptureButtonProps) {
     <Button
       onClick={handleCapture}
       size="icon"
-      // `dark` pins this to the dark palette, so `foreground` stays near-white in
-      // both themes. It floats over the artwork rather than over a themed
-      // surface, so following the page theme inverted it into a black disc on
-      // the shader whenever dark mode was on.
-      //
-      // The 24px in `right` is the gap to the sidebar's edge, held constant as
-      // the sidebar is resized (see use-resizable-sidebar.ts).
-      className="dark group hidden md:flex fixed bottom-6 right-[calc(var(--sidebar-width,280px)+24px)] size-14 rounded-full border-2 border-foreground bg-transparent p-1 shadow-none z-10 hoverFine:bg-transparent cursor-pointer"
+      // Unpositioned, like CaptureThumbnail: the floating toolbar lays it out.
+      // It sits on a themed surface now rather than directly over the artwork,
+      // so it follows the page theme instead of being pinned to one palette.
+      // Ring heavier than the gap it encloses, as on mobile: a thin ring with a
+      // wide gap reads as two concentric shapes rather than one shutter. The
+      // 36px dot is unchanged, so it still matches the selected shader tab.
+      className="group flex size-12 rounded-full border-4 border-shutter-ink bg-transparent p-[2px] shadow-none hoverFine:bg-transparent cursor-pointer"
       aria-label="Capture frame"
     >
-      <span className="size-11 rounded-full bg-foreground transition-transform duration-100 ease-out group-active:scale-90 motion-reduce:transition-none" />
+      <span className="size-9 rounded-full bg-shutter-ink transition-transform duration-100 ease-out group-active:scale-90 motion-reduce:transition-none" />
     </Button>
   )
 }

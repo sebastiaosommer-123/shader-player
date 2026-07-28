@@ -1,3 +1,5 @@
+import { measureDesktopSlotRect } from "./toolbar-geometry"
+
 export interface Rect {
   top: number
   left: number
@@ -24,6 +26,12 @@ export function calculateAnimationPositions(
   canvasElement: HTMLElement,
   imageCount: number,
   isMobile: boolean,
+  /**
+   * A target worked out by the caller, used as-is. Desktop passes one: its slot
+   * animates open over the whole flight, so its live rect is useless here — see
+   * measureDesktopSlotRect in lib/toolbar-geometry.ts.
+   */
+  targetOverride?: Rect | null,
 ): { source: Rect; target: Rect } {
   // Get canvas bounding box as source
   const canvasRect = canvasElement.getBoundingClientRect()
@@ -33,6 +41,8 @@ export function calculateAnimationPositions(
     width: canvasRect.width,
     height: canvasRect.height,
   }
+
+  if (targetOverride) return { source, target: targetOverride }
 
   // The mobile bar keeps a zero-opacity placeholder in the thumbnail slot, so
   // this resolves even on the first capture. Skip anything with no layout box:
@@ -54,36 +64,26 @@ export function calculateAnimationPositions(
     return { source, target }
   }
 
-  // Fallback if neither element is in the DOM. Mirrors the thumbnail geometry
-  // by hand, so it has to be kept in step with mobile-nav.tsx / capture-thumbnails.tsx.
-  let thumbWidth: number
-  let thumbHeight: number
-  let targetTop: number
-  let targetLeft: number
-  let targetRadius: number
-
-  if (isMobile) {
-    // Square, bottom-left, vertically centred in the 68px control bar.
-    thumbWidth = 44
-    thumbHeight = 44
-    targetTop = window.innerHeight - 16 - 68 + (68 - thumbHeight) / 2
-    targetLeft = 24 // px-6 = 24px
-    targetRadius = 8
-  } else {
-    // Aspect-ratio preserving rounded rect, bottom-left.
-    thumbHeight = 80
-    thumbWidth = thumbHeight * (source.width / source.height)
-    targetTop = window.innerHeight - 16 - thumbHeight // bottom-4 = 16px
-    targetLeft = 24 // left-6 = 24px
-    targetRadius = 8
+  // Fallback if neither element is in the DOM. Both bars keep a real target in
+  // the tree at all times, so this should not fire.
+  //
+  // Desktop derives rather than duplicating: its geometry lives next to the
+  // toolbar that owns it, which is also the path the caller normally takes.
+  if (!isMobile) {
+    const derived = measureDesktopSlotRect()
+    if (derived) return { source, target: derived }
   }
 
+  // Circle in the lower row of the mobile control bar, at its left edge. Still
+  // hand-copied, so it has to be kept in step with mobile-nav.tsx.
+  const size = 44
   const target: Rect = {
-    top: targetTop,
-    left: targetLeft,
-    width: thumbWidth,
-    height: thumbHeight,
-    radius: targetRadius,
+    top: window.innerHeight - 16 - size,
+    left: 24, // px-6 = 24px
+    width: size,
+    height: size,
+    // Clamped to a circle the same way readRadius clamps the measured value.
+    radius: size / 2,
   }
 
   return { source, target }

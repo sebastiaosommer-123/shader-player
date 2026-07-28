@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import type { Rect } from "@/lib/animation-utils"
 import { useReducedMotion } from "framer-motion"
+import { captureFlight } from "@/lib/springs"
 
 interface CaptureAnimationOverlayProps {
   imageDataUrl: string
@@ -41,9 +42,14 @@ export function CaptureAnimationOverlay({
       })
     })
 
-    const timeout = setTimeout(() => {
-      onComplete()
-    }, prefersReducedMotion ? 180 : 550)
+    const timeout = setTimeout(
+      () => {
+        onComplete()
+      },
+      // A small buffer past the transition, so the frame is fully settled in the
+      // slot before the real thumbnail swaps in underneath it.
+      (prefersReducedMotion ? captureFlight.reducedMs : captureFlight.durationMs) + 50,
+    )
 
     return () => clearTimeout(timeout)
   }, [mounted, onComplete, prefersReducedMotion])
@@ -81,9 +87,11 @@ export function CaptureAnimationOverlay({
     : "translate3d(0, 0, 0) scale(1)"
   let transition = "none"
   if (isAnimating) {
+    // The toolbar's slot opens on these same numbers — see lib/springs.ts.
+    const { durationMs, easing, reducedMs } = captureFlight
     transition = prefersReducedMotion
-      ? "opacity 150ms cubic-bezier(0.23, 1, 0.32, 1)"
-      : "transform 500ms cubic-bezier(0.32, 0.72, 0, 1), opacity 500ms cubic-bezier(0.32, 0.72, 0, 1), clip-path 500ms cubic-bezier(0.32, 0.72, 0, 1)"
+      ? `opacity ${reducedMs}ms cubic-bezier(0.23, 1, 0.32, 1)`
+      : `transform ${durationMs}ms ${easing}, opacity ${durationMs}ms ${easing}, clip-path ${durationMs}ms ${easing}`
   }
   let animatedOpacity = 1
   if (isAnimating) animatedOpacity = prefersReducedMotion ? 0 : 0.98

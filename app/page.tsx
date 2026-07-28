@@ -5,8 +5,7 @@ import { AnimatePresence } from "framer-motion"
 import { ShaderCanvas, type ShaderCanvasRef } from "@/components/shader-canvas"
 import { ControlsSidebar } from "@/components/controls-sidebar"
 import { MobileNav } from "@/components/mobile-nav"
-import { CaptureButton } from "@/components/capture-button"
-import { CaptureThumbnails } from "@/components/capture-thumbnails"
+import { FloatingToolbar } from "@/components/floating-toolbar"
 import { WallpaperGallery } from "@/components/wallpaper-gallery"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import type { CapturedImage } from "@/lib/types"
@@ -14,6 +13,7 @@ import { captureCanvas } from "@/lib/canvas-capture"
 import { CaptureAnimationOverlay } from "@/components/capture-animation-overlay"
 import { calculateAnimationPositions } from "@/lib/animation-utils"
 import type { Rect } from "@/lib/animation-utils"
+import { measureDesktopSlotRect } from "@/lib/toolbar-geometry"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { useResizableSidebar } from "@/hooks/use-resizable-sidebar"
 
@@ -27,6 +27,10 @@ export default function Home() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [clickedImageId, setClickedImageId] = useState<string | null>(null)
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
+  // The desktop toolbar's thumbnail slot is closed until the first capture, and
+  // opens as the frame flies into it. Once open it stays until the last image is
+  // deleted, at which point it closes again.
+  const [slotReserved, setSlotReserved] = useState(false)
   const shaderCanvasRef = useRef<ShaderCanvasRef>(null)
 
   const [captureAnimation, setCaptureAnimation] = useState<{
@@ -49,7 +53,15 @@ export default function Home() {
 
     const isMobile = window.innerWidth < 768
     const captured = captureCanvas({ canvas, params, isMobile })
-    const positions = calculateAnimationPositions(canvas, 0, isMobile)
+
+    // Measure before opening the slot, not after. The desktop slot takes the
+    // whole flight to widen, so from here until the frame lands its live rect is
+    // mid-animation; measureDesktopSlotRect derives where it will come to rest
+    // instead. Ordering matters — this has to read the layout that setSlotReserved
+    // is about to change.
+    const slotRect = isMobile ? null : measureDesktopSlotRect()
+    const positions = calculateAnimationPositions(canvas, 0, isMobile, slotRect)
+    setSlotReserved(true)
 
     const newImage: CapturedImage = {
       id: `${Date.now()}-${Math.random()}`,
@@ -74,7 +86,10 @@ export default function Home() {
   }
 
   const handleDeleteImage = (id: string) => {
-    setCapturedImages((prev) => prev.filter((img) => img.id !== id))
+    const remaining = capturedImages.filter((img) => img.id !== id)
+    setCapturedImages(remaining)
+    // Nothing left to show: let the toolbar shrink back to its resting width.
+    if (remaining.length === 0) setSlotReserved(false)
     setDeletingImageId(null)
   }
 
@@ -133,7 +148,6 @@ export default function Home() {
           params={params}
           setParams={setParams}
           shaderId={shaderId}
-          onShaderChange={handleShaderChange}
           onResizeStart={startResize}
           isResizing={isResizing}
         />
@@ -151,13 +165,18 @@ export default function Home() {
         hiddenImageId={deletingImageId}
       />
 
-      <CaptureButton onCapture={handleCapture} />
-
-      <CaptureThumbnails
+      {/* Desktop's floating control bar. A sibling of the canvas, never a child:
+          the canvas wrapper above is scoped `dark`, and this bar follows the
+          page theme. */}
+      <FloatingToolbar
+        shaderId={shaderId}
+        onShaderChange={handleShaderChange}
+        onCapture={handleCapture}
         images={capturedImages}
-        onClick={handleThumbnailClick}
+        onThumbnailClick={handleThumbnailClick}
         isCapturing={!!captureAnimation}
         hiddenImageId={deletingImageId}
+        hasSlot={slotReserved || capturedImages.length > 0}
       />
 
       <AnimatePresence>

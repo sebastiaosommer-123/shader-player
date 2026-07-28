@@ -1,7 +1,6 @@
 "use client"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import { ParameterGroup } from "./parameter-group"
-import { ShaderSelector } from "./shader-selector"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { X } from "lucide-react"
 import { playDigitalClick } from "@/lib/audio-feedback"
@@ -14,10 +13,9 @@ interface ControlsSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   shaderId: string
-  onShaderChange: (shaderId: string) => void
 }
 
-export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId, onShaderChange }: ControlsSheetProps) {
+export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId }: ControlsSheetProps) {
   const prefersReducedMotion = useReducedMotion()
   let sheetDuration = open ? "250ms" : "200ms"
   let contentDuration = open ? "150ms" : "100ms"
@@ -66,13 +64,16 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId,
             pointerEvents: open ? "auto" : "none",
           }}
         >
-          <div>
-            <ShaderSelector currentShaderId={shaderId} onShaderChange={onShaderChange} />
-          </div>
-
+          {/* No shader picker here: the tab bar in the control bar behind this
+              sheet already shows all three, so the sheet is purely the active
+              shader's parameters. */}
           {shaderConfig.parameterGroups.map((group) => (
             <ParameterGroup
-              key={group.name}
+              // Keyed by shader too — see the matching note in ControlsSidebar.
+              // A bare group-name key lets React carry a Collapsible over to a
+              // shader that shares the name, and it replays its open animation
+              // against the height it measured for the previous shader.
+              key={`${shaderId}:${group.name}`}
               group={group}
               params={params}
               onChange={updateParam}

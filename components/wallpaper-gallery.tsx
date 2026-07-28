@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef } from "react"
 import { flushSync } from "react-dom"
-import { motion, useReducedMotion } from "framer-motion"
+import { motion, useIsPresent, useReducedMotion } from "framer-motion"
 import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { CapturedImage } from "@/lib/types"
 import { downloadImage } from "@/lib/canvas-capture"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { playDownloadConfirmation } from "@/lib/download-audio"
+import { galleryMorph } from "@/lib/springs"
 import { BurningImage } from "@/components/burning-image"
 import { ScanLineOverlay } from "@/components/scan-line-overlay"
 
@@ -41,6 +42,10 @@ export function WallpaperGallery({
   const isNavigatingRef = useRef(false)
 
   const prefersReducedMotion = useReducedMotion()
+  // Flips false the instant AnimatePresence starts removing us — long before it
+  // actually unmounts us, which it will not do until the fades below finish.
+  // See the shared-element container's own comment for why that matters.
+  const isPresent = useIsPresent()
 
   useEffect(() => {
     if (currentIndex >= reversedImages.length && reversedImages.length > 0) {
@@ -175,8 +180,8 @@ export function WallpaperGallery({
     displayIndex = Math.max(0, displayCount - 1)
   }
 
-  const springTransition = { type: "spring" as const, stiffness: 280, damping: 28 }
   const reducedTransition = { duration: 0.15, ease: "easeInOut" as const }
+  const morphTransition = prefersReducedMotion ? reducedTransition : galleryMorph
 
   return (
     <div className="fixed inset-0 z-50">
@@ -189,46 +194,65 @@ export function WallpaperGallery({
         transition={prefersReducedMotion ? reducedTransition : { duration: 0.25, ease: "easeOut" }}
       />
 
-      {/* Image container — shared element transition from thumbnail */}
-      <motion.div
-        layoutId={`gallery-container-${openedImageId}`}
-        className="fixed inset-0 overflow-hidden"
-        style={{ borderRadius: 0 }}
-        transition={prefersReducedMotion ? reducedTransition : springTransition}
-        onClick={handleClose}
-      >
-        {currentImage && (
-          <img
-            src={currentImage.dataUrl || "/placeholder.svg"}
-            alt={`Captured frame ${currentIndex + 1}`}
-            className="w-full h-full object-contain"
-            style={
-              prefersReducedMotion
-                ? { opacity: imageVisible ? 1 : 0, transition: "opacity 150ms ease-in-out" }
-                : {
-                    opacity: isBurnReady ? 0 : imageVisible ? 1 : 0,
-                    transform: `translateX(${slideX}px)`,
-                    transition: slideTransition
-                      ? "transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out"
-                      : "none",
-                  }
-            }
-            onClick={(e) => e.stopPropagation()}
-          />
-        )}
+      {/* Image container — shared element transition from thumbnail.
+          Dropped the moment the close begins rather than when AnimatePresence
+          finally unmounts us. Framer can only hand the layoutId back to the
+          thumbnail once this node is gone, and AnimatePresence holds the whole
+          subtree alive until the slowest exit below finishes — which used to
+          mean a quarter-second of the image sitting fullscreen while the
+          backdrop dissolved off it, and only then a collapse. Now the collapse
+          starts on the click frame and those fades run alongside it. */}
+      {isPresent && (
+        <motion.div
+          layoutId={`gallery-container-${openedImageId}`}
+          className="fixed inset-0 overflow-hidden"
+          style={{ borderRadius: 0 }}
+          transition={morphTransition}
+          onClick={handleClose}
+        >
+          {currentImage && (
+            // The prev/next slide rides on this wrapper, not on the image
+            // itself. The image is a projection node now, so Framer owns its
+            // transform for the length of the morph; a second transform on the
+            // same element would be overwritten mid-flight and fight the spring.
+            <div
+              className="absolute inset-0"
+              style={
+                prefersReducedMotion
+                  ? { opacity: imageVisible ? 1 : 0, transition: "opacity 150ms ease-in-out" }
+                  : {
+                      opacity: isBurnReady ? 0 : imageVisible ? 1 : 0,
+                      transform: `translateX(${slideX}px)`,
+                      transition: slideTransition
+                        ? "transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out"
+                        : "none",
+                    }
+              }
+            >
+              <motion.img
+                layoutId={`gallery-image-${openedImageId}`}
+                transition={morphTransition}
+                src={currentImage.dataUrl || "/placeholder.svg"}
+                alt={`Captured frame ${currentIndex + 1}`}
+                className="absolute inset-0 w-full h-full object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
 
-        {isDeleting && currentImage && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <BurningImage src={currentImage.dataUrl} onComplete={handleBurnComplete} onReady={handleBurnReady} />
-          </div>
-        )}
+          {isDeleting && currentImage && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <BurningImage src={currentImage.dataUrl} onComplete={handleBurnComplete} onReady={handleBurnReady} />
+            </div>
+          )}
 
-        {isScanning && currentImage && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <ScanLineOverlay src={currentImage.dataUrl} onComplete={handleScanComplete} />
-          </div>
-        )}
-      </motion.div>
+          {isScanning && currentImage && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <ScanLineOverlay src={currentImage.dataUrl} onComplete={handleScanComplete} />
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {/* UI controls — fade in after image settles */}
       <motion.div

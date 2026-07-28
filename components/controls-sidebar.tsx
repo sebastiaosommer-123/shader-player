@@ -2,7 +2,6 @@
 
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import { ParameterGroup } from "./parameter-group"
-import { ShaderSelector } from "./shader-selector"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { CreditsFooter } from "./credits-footer"
 import { AppearanceControl } from "./appearance-control"
@@ -11,7 +10,6 @@ interface ControlsSidebarProps {
   params: ShaderParams
   setParams: (params: ShaderParams) => void
   shaderId: string
-  onShaderChange: (shaderId: string) => void
   onResizeStart: (event: React.PointerEvent<HTMLElement>) => void
   isResizing: boolean
 }
@@ -20,7 +18,6 @@ export function ControlsSidebar({
   params,
   setParams,
   shaderId,
-  onShaderChange,
   onResizeStart,
   isResizing,
 }: ControlsSidebarProps) {
@@ -53,15 +50,21 @@ export function ControlsSidebar({
 
       {/* The scroll container has to be its own wrapper: putting the overflow on
           the padded column below turns that column into a definite-height flex
-          parent, and its children — the shader dropdown first — get squashed
-          instead of keeping their natural height. */}
+          parent, and its children — the parameter groups — get squashed instead
+          of keeping their natural height. */}
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+        {/* Parameters only. Choosing a shader is the floating toolbar's job. */}
         <div className="p-4 space-y-5 bg-background flex-1 flex flex-col">
-          <ShaderSelector currentShaderId={shaderId} onShaderChange={onShaderChange} />
-
           {shaderConfig.parameterGroups.map((group) => (
             <ParameterGroup
-              key={group.name}
+              // Keyed by shader too, not by group name alone. Two shaders can
+              // name a group the same thing — "Vertical Wave" and "Horizontal
+              // Wave" exist in both Gradient Wave and Pixel Topography — and a
+              // bare name key makes React reuse the instance across the switch.
+              // The Collapsible inside then keeps the height it measured for the
+              // *other* shader's parameter count and replays its open animation
+              // against it, so the group renders clipped to a stale height.
+              key={`${shaderId}:${group.name}`}
               group={group}
               params={params}
               onChange={updateParam}
