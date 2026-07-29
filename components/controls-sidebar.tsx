@@ -73,7 +73,7 @@ export function ControlsSidebar({
           ))}
 
           <div className="mt-auto space-y-4">
-            <AppearanceControl />
+            <AppearanceControl layoutIdPrefix="desktop" />
             <CreditsFooter />
           </div>
         </div>

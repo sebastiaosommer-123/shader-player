@@ -5,6 +5,7 @@ import { getShaderConfig } from "@/lib/shader-configs"
 import { X } from "lucide-react"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { CreditsFooter } from "./credits-footer"
+import { AppearanceControl } from "./appearance-control"
 import { useReducedMotion } from "framer-motion"
 
 interface ControlsSheetProps {
@@ -81,10 +82,13 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId 
             />
           ))}
 
-          {/* No appearance control here: mobile chrome is always dark, so the
-              toggle would sit in the sheet changing nothing visible. Light/dark
-              is a desktop choice — the sidebar keeps its copy. */}
+          {/* The appearance control is here for parity with the sidebar, but
+              note it has no visible effect from inside this sheet: the mobile
+              bar and this sheet are both pinned `dark`, and the rest of the
+              screen is the shader canvas, which doesn't read the theme. What it
+              sets is the theme the desktop layout will open with. */}
           <div className="mt-auto space-y-4">
+            <AppearanceControl layoutIdPrefix="mobile" />
             <CreditsFooter />
           </div>
         </div>

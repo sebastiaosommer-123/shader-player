@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from "framer-motion"
 import { getAllShaderIds, getShaderConfig } from "@/lib/shader-configs"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { useSurface } from "@/lib/surface-context"
-import { SURFACE_BG } from "@/lib/surface-classes"
+import { raisedThumb } from "@/lib/surface-classes"
 import { spring } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 
@@ -51,25 +51,9 @@ export function ShaderTabs({ shaderId, onShaderChange, layoutIdPrefix, size = "d
   // selected cell climbs back out of it. Reading the substrate rather than
   // hardcoding a level is what lets the same component sit in the light
   // floating toolbar and in the pinned-dark mobile bar and read raised in both.
-  //
-  // Four steps, not one, because the thing to clear is the track, not the bar.
-  // The track is a 6% white wash over the substrate, which in dark mode lifts
-  // it further than a single surface step does — at +1 the "raised" cell came
-  // out *darker* than the recess around it, and the only thing still reading as
-  // a thumb was the ring. Fill first, outline second.
-  //
-  // Fill only — none of the surface shadow levels work here, because every one
-  // of them carries a `0 0 0 1px` ring, and a ring on a cell that butts its
-  // neighbours reads as a border drawn around the selection rather than as the
-  // selection sitting proud of the track. What lifts a thumb out of a recess is
-  // the contact shadow under it, so keep that layer and drop the ring.
-  const raised = cn(
-    SURFACE_BG[Math.min(8, Math.round(substrate + 4))],
-    "shadow-[0_1px_1px_-0.5px_var(--shadow-color)]",
-    // Dark keeps the top bevel: on a dark track the fill alone is a small step,
-    // and the highlight is what says "top edge" without outlining the shape.
-    "dark:shadow-[inset_0_1px_0_0_var(--dm-hi-mid),0_1px_1px_-0.5px_var(--dm-drop)]",
-  )
+  // The recipe itself lives in lib/surface-classes.ts, shared with the
+  // appearance toggle.
+  const raised = raisedThumb(substrate)
 
   const handleSelect = (id: string) => {
     if (id === shaderId) return
