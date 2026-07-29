@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { ChevronRight } from "lucide-react"
 import type { ShaderParameterGroup } from "@/lib/shader-configs"
 import type { ShaderParams } from "@/lib/shader-uniforms"
@@ -28,6 +29,11 @@ export function ParameterGroup({ group, params, onChange, shaderId, spacing = "n
   // collapse, leaving dead space under every closed section.
   const headerGap = spacing === "compact" ? "pt-1" : "pt-3"
   const [collapsed, toggleCollapsed] = useCollapsedGroup(shaderId, group.name)
+  // The collapse animation needs its content clipped, but a clip that outlives
+  // the animation also eats the first slider's hover tooltip, which sits 30px
+  // above the slider and so pokes out of the top of an open group. Clip only
+  // while the height is actually moving.
+  const [animating, setAnimating] = useState(false)
 
   const handleToggle = () => {
     playDigitalClick("weak")
@@ -50,7 +56,20 @@ export function ParameterGroup({ group, params, onChange, shaderId, spacing = "n
       {/* The collapsible-down/up keyframes and the --radix-collapsible-content-height
           they read both ship with tw-animate-css, so the height animation needs
           no CSS of its own. */}
-      <CollapsibleContent className="overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up motion-reduce:animate-none">
+      <CollapsibleContent
+        // Only this element's own collapse animation counts; animation events
+        // from anything inside bubble up here too.
+        onAnimationStart={(e) => {
+          if (e.target === e.currentTarget) setAnimating(true)
+        }}
+        onAnimationEnd={(e) => {
+          if (e.target === e.currentTarget) setAnimating(false)
+        }}
+        className={cn(
+          "data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up motion-reduce:animate-none",
+          (animating || collapsed) && "overflow-hidden"
+        )}
+      >
         <div className={cn(headerGap, group.layout === "wrap" ? "flex flex-wrap gap-2" : gap)}>
           {group.parameters.map((param) => {
             if (param.type === "slider") {
