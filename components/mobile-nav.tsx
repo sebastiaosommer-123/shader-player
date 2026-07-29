@@ -110,7 +110,16 @@ export function MobileNav({
             {/* z-10 for the gallery exit: the thumbnail is scaled to the full
                 viewport inside this row on the way back, and the tabs and the
                 filters button would otherwise paint over it. */}
-            <div className="relative z-10 transition-[opacity,transform]" style={hideWhileSheetOpen(180)}>
+            {/* The footprint is fixed here rather than left to whatever is
+                inside, because what is inside depends on useIsMobile — which
+                reports false on the first render and only corrects in an
+                effect. Sizing this from its contents meant the row's left slot
+                was 0 wide for one paint, and `justify-between` started the tabs
+                22px left of centre before sliding them over. */}
+            <div
+              className="relative z-10 shrink-0 transition-[opacity,transform]"
+              style={{ ...hideWhileSheetOpen(180), width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}
+            >
               {showThumbnail ? (
                 <CaptureThumbnail
                   image={latestImage}

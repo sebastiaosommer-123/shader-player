@@ -44,18 +44,19 @@ export function measureDesktopSlotRect(): Rect | null {
   // CSS-hidden below md — no layout box, so there is nothing to land on.
   if (barRect.width === 0) return null
 
-  const tabs = bar.querySelector('[role="radiogroup"]')
-  const shutter = bar.querySelector('[aria-label="Capture frame"]')
+  const tabs = bar.querySelector<HTMLElement>('[role="radiogroup"]')
+  const shutter = bar.querySelector<HTMLElement>('[aria-label="Capture frame"]')
   if (!tabs || !shutter) return null
 
+  // offsetWidth, not getBoundingClientRect().width: this runs from the shutter's
+  // own click handler, while the button is still held down and wearing its
+  // `active:scale-90`. A bounding rect is the *transformed* box, so the shutter
+  // would measure 43.2 mid-press, making the bar seem 4.8px narrower than it
+  // will be at rest and aiming the flight 2.4px to the right of the slot. The
+  // frame then lands a hair off and the thumbnail snaps left as it swaps in.
+  // Layout width is immune to the press.
   const openWidth =
-    BAR_PADDING +
-    SLOT_SIZE +
-    BAR_GAP +
-    tabs.getBoundingClientRect().width +
-    BAR_GAP +
-    shutter.getBoundingClientRect().width +
-    BAR_PADDING
+    BAR_PADDING + SLOT_SIZE + BAR_GAP + tabs.offsetWidth + BAR_GAP + shutter.offsetWidth + BAR_PADDING
 
   return {
     // The bar's height never changes as the slot opens, so its top is safe to

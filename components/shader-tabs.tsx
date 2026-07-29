@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from "framer-motion"
 import { getAllShaderIds, getShaderConfig } from "@/lib/shader-configs"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { useSurface } from "@/lib/surface-context"
-import { surfaceClasses } from "@/lib/surface-classes"
+import { SURFACE_BG } from "@/lib/surface-classes"
 import { spring } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 
@@ -25,17 +25,16 @@ interface ShaderTabsProps {
  * Not one set of numbers for both bars: each track has to sit with whatever its
  * own bar puts beside it, and the two bars put different things there.
  *
- * Desktop's cells fill the track outright — no padding, no gap — so the selected
- * indicator is a 48px circle, the same box as the thumbnail slot and the shutter
- * ring on either side of it. Three identical circles across the bar, and the
- * recess reads as the capsule behind the two unselected digits. The digit steps
- * up to 16px with them; 14px is lost in a 48px circle.
+ * Both tracks are 48 tall with 4px of inset, which puts their cells at 40. That
+ * keeps the track's ends on the same line as the thumbnail slot and the shutter
+ * either side of it, while the selected cell stays a step down from them — the
+ * tabs are where you are, not the thing you came here to press.
  *
- * Mobile's neighbours are 44 and its cells are 40 for the touch target, so it
- * keeps its inset track.
+ * They differ only between the cells: desktop butts them, keeping the track at
+ * 128, while mobile spaces them for the touch targets.
  */
 const SIZES = {
-  desktop: { track: "gap-0 p-0", cell: "size-12", text: "text-base" },
+  desktop: { track: "gap-0 p-1", cell: "size-10", text: "text-sm" },
   mobile: { track: "gap-1 p-1", cell: "size-10", text: "text-sm" },
 } as const
 
@@ -59,11 +58,18 @@ export function ShaderTabs({ shaderId, onShaderChange, layoutIdPrefix, size = "d
   // out *darker* than the recess around it, and the only thing still reading as
   // a thumb was the ring. Fill first, outline second.
   //
-  // Shadow pinned at 2 for the same reason: level 3 and up add a black
-  // `0 0 0 1px` outside the box, which is a contact shadow for something
-  // floating on a page. There is nothing to cast onto inside a recess, so on a
-  // dark track it just draws a moat.
-  const raised = surfaceClasses(substrate + 4, 2)
+  // Fill only — none of the surface shadow levels work here, because every one
+  // of them carries a `0 0 0 1px` ring, and a ring on a cell that butts its
+  // neighbours reads as a border drawn around the selection rather than as the
+  // selection sitting proud of the track. What lifts a thumb out of a recess is
+  // the contact shadow under it, so keep that layer and drop the ring.
+  const raised = cn(
+    SURFACE_BG[Math.min(8, Math.round(substrate + 4))],
+    "shadow-[0_1px_1px_-0.5px_var(--shadow-color)]",
+    // Dark keeps the top bevel: on a dark track the fill alone is a small step,
+    // and the highlight is what says "top edge" without outlining the shape.
+    "dark:shadow-[inset_0_1px_0_0_var(--dm-hi-mid),0_1px_1px_-0.5px_var(--dm-drop)]",
+  )
 
   const handleSelect = (id: string) => {
     if (id === shaderId) return
@@ -105,14 +111,7 @@ export function ShaderTabs({ shaderId, onShaderChange, layoutIdPrefix, size = "d
                 layoutId={prefersReducedMotion ? undefined : `${layoutIdPrefix}-shader-tab`}
                 transition={spring.moderate}
                 aria-hidden
-                // Both themes paint a 1px hairline, on opposite sides of the
-                // box: light spreads it outward (`0 0 0 1px`), dark draws it
-                // inset. Filling the cell edge to edge would therefore render
-                // 50px in light and 48 in dark, against a shutter that is 48 in
-                // both — its ring being a border, always inside. So pull the
-                // box in by the hairline's width only where the hairline sits
-                // outside it, and both themes land on 48.
-                className={cn("absolute inset-px dark:inset-0 rounded-full", raised)}
+                className={cn("absolute inset-0 rounded-full", raised)}
               />
             )}
             {/* Above the indicator, which is painted into the same box. */}

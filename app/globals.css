@@ -41,22 +41,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  /*
-   * The shutter's ink, deliberately not `--foreground` on both sides.
-   *
-   * Mirroring one token makes the light shutter the heavier of the two. Ink at
-   * full strength is 15.3:1 against the white bar and 14.7:1 against the dark
-   * one — near-identical on paper — but light-on-dark blooms and spreads while
-   * dark-on-light stays solid, so the same 4px ring reads noticeably denser as
-   * black on white. Matching the measurement is what causes the mismatch.
-   *
-   * Landing at 10.4:1 instead: enough below the dark side to pay for the bloom,
-   * tuned by eye against it. 12.6:1 still read as a black hole; 8.5:1 tipped
-   * over into looking disabled. Colour only — the 48px box and 36px dot are
-   * load-bearing for the toolbar's size ladder, so weight can't come out of
-   * the geometry.
-   */
-  --shutter-ink: oklch(0.37 0 0);
+  /* The shutter, a touch off full-strength ink: black-on-white reads denser
+     than the white-on-dark it mirrors, so matching --foreground exactly makes
+     the light shutter the heavier of the two. */
+  --shutter-ink: oklch(0.28 0 0);
   --surface-1: #FAFAFA;
   --surface-2: #FCFCFC;
   --surface-3: #FFFFFF;
@@ -113,8 +101,7 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
-  /* Dark is the side the shutter was designed on — full-strength ink is right
-     here, and the mobile bar (pinned dark) already renders it that way. */
+  /* Dark needs no pullback — full strength is right on this side. */
   --shutter-ink: var(--foreground);
   --surface-1: #171717;
   --surface-2: #1E1E1E;
