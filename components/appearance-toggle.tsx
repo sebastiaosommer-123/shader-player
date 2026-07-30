@@ -65,7 +65,14 @@ export function AppearanceToggle() {
         // the sidebar's 247px, and a 36px button plus the gap tipped the row
         // over into wrapping the text at the *default* width, not just the
         // minimum. `shrink-0` keeps it square while the text reflows around it.
-        className="shrink-0 flex size-8 items-center justify-center rounded-[8px] text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hoverFine:text-foreground hoverFine:bg-foreground/[0.06] active:scale-[0.97] motion-reduce:transition-none"
+        //
+        // `-mr-2` is optical alignment, not a nudge. The box is 32px around a
+        // 16px glyph, so sitting the box flush with the column left the mark
+        // 8px inside the right edge every slider and swatch above it lines up
+        // on. Pulling the box out by exactly its own padding puts the glyph on
+        // that edge while the 32px hit area survives; the hover fill bleeds
+        // into the sidebar's padding, which still leaves 8px to the frame.
+        className="-mr-2 shrink-0 flex size-8 items-center justify-center rounded-[8px] text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hoverFine:text-foreground hoverFine:bg-foreground/[0.06] active:scale-[0.97] motion-reduce:transition-none"
       >
         {/* The icon swaps rather than morphs — three unrelated glyphs have no
             shared shape to tween — so it cross-fades on a short rise. */}
