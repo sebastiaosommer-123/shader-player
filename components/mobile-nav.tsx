@@ -9,12 +9,11 @@ import { ShaderTabs } from "./shader-tabs"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { useReducedMotion } from "framer-motion"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { useIcon } from "@/lib/icon-context"
 
 /** Matches the iOS camera proportions: shutter ring, round thumb, round control. */
 const CAPTURE_SIZE = 68
 const THUMBNAIL_SIZE = 44
-const FILTERS_SIZE = 44
+const FILTERS_SIZE = 48
 /**
  * Half the box — a true circle, written as the real radius. Framer's layout
  * projection interpolates this value during the gallery morph, so an oversized
@@ -48,7 +47,6 @@ export function MobileNav({
   const [sheetOpen, setSheetOpen] = useState(false)
   const prefersReducedMotion = useReducedMotion()
   const isMobile = useIsMobile()
-  const SlidersIcon = useIcon("sliders-horizontal")
 
   const hiddenTransform = sheetOpen && !prefersReducedMotion ? "scale(0.97)" : "scale(1)"
   const hideWhileSheetOpen = (duration: number) => ({
@@ -162,11 +160,18 @@ export function MobileNav({
                 playDigitalClick("strong")
                 setSheetOpen(true)
               }}
-              className="flex items-center justify-center rounded-full text-muted-foreground transition-[opacity,transform] active:scale-[0.97]"
+              className="flex items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground transition-[color,opacity,transform] hoverFine:text-foreground active:scale-[0.97]"
               aria-label="Shader controls"
               style={{ ...hideWhileSheetOpen(180), width: FILTERS_SIZE, height: FILTERS_SIZE }}
             >
-              <SlidersIcon size={24} strokeWidth={2} />
+              <span
+                aria-hidden
+                className="size-5 bg-current"
+                style={{
+                  WebkitMask: "url(/filter.svg?v=2) center / contain no-repeat",
+                  mask: "url(/filter.svg?v=2) center / contain no-repeat",
+                }}
+              />
             </button>
           </div>
         </div>

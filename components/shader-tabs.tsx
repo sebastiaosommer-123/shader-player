@@ -34,9 +34,15 @@ interface ShaderTabsProps {
  * 128, while mobile spaces them for the touch targets.
  */
 const SIZES = {
-  desktop: { track: "gap-0 p-1", cell: "size-10", text: "text-sm" },
-  mobile: { track: "gap-1 p-1", cell: "size-10", text: "text-sm" },
+  desktop: { track: "gap-0 p-1", cell: "size-10", icon: "size-5" },
+  mobile: { track: "gap-1 p-1", cell: "size-10", icon: "size-5" },
 } as const
+
+const SHADER_ICONS: Record<string, string> = {
+  terracotta: "/wave.svg",
+  plasma: "/tile.svg",
+  pixelTopography: "/topography.svg",
+}
 
 /**
  * Every shader, always visible. Replaces the dropdown that used to hide the
@@ -67,9 +73,10 @@ export function ShaderTabs({ shaderId, onShaderChange, layoutIdPrefix, size = "d
       aria-label="Shader"
       className={cn("flex items-center rounded-full bg-foreground/[0.06]", SIZES[size].track)}
     >
-      {shaderIds.map((id, index) => {
+      {shaderIds.map((id) => {
         const isSelected = id === shaderId
         const shader = getShaderConfig(id)
+        const iconSrc = SHADER_ICONS[id]
 
         return (
           <button
@@ -77,16 +84,12 @@ export function ShaderTabs({ shaderId, onShaderChange, layoutIdPrefix, size = "d
             type="button"
             role="radio"
             aria-checked={isSelected}
-            // The label is a placeholder digit until each shader has an icon, so
-            // the name has to reach screen readers and hover some other way —
-            // there is no dropdown listing the names any more.
             aria-label={shader.name}
             title={shader.name}
             onClick={() => handleSelect(id)}
             className={cn(
               "relative flex items-center justify-center rounded-full transition-[color,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none",
               SIZES[size].cell,
-              SIZES[size].text,
               isSelected ? "text-foreground" : "text-muted-foreground hoverFine:text-foreground",
             )}
           >
@@ -99,7 +102,14 @@ export function ShaderTabs({ shaderId, onShaderChange, layoutIdPrefix, size = "d
               />
             )}
             {/* Above the indicator, which is painted into the same box. */}
-            <span className="relative">{index + 1}</span>
+            <span
+              aria-hidden
+              className={cn("relative shrink-0 bg-current", SIZES[size].icon)}
+              style={{
+                WebkitMask: `url(${iconSrc}) center / contain no-repeat`,
+                mask: `url(${iconSrc}) center / contain no-repeat`,
+              }}
+            />
           </button>
         )
       })}
