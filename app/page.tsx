@@ -16,9 +16,14 @@ import type { Rect } from "@/lib/animation-utils"
 import { measureDesktopSlotRect } from "@/lib/toolbar-geometry"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { useResizableSidebar } from "@/hooks/use-resizable-sidebar"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { cn } from "@/lib/utils"
 
 export default function Home() {
   const [shaderId, setShaderId] = useState<string>("terracotta")
+  // Mobile is dark-only, so the palette is pinned at the root rather than
+  // scoped piecemeal below it. See the note on the container's className.
+  const isMobile = useIsMobile()
   const { width: sidebarWidth, isResizing, startResize } = useResizableSidebar()
   const [params, setParams] = useState<ShaderParams>(getShaderConfig("terracotta").defaultParams)
 
@@ -125,7 +130,21 @@ export default function Home() {
     // line up with it (the capture button) read one value; the canvas just takes
     // whatever flex-1 leaves over.
     <div
-      className="h-screen w-screen flex flex-col md:flex-row overflow-hidden"
+      // `dark` on the root below md, which is the one place it can go and cover
+      // everything: mobile has no light mode at all. The bar, the sheet and the
+      // canvas already pinned themselves dark individually, but that left every
+      // root-level sibling following the page theme — the wallpaper gallery
+      // most visibly, since it is `fixed inset-0 bg-background` and opens from
+      // the capture thumbnail. Pinning here catches those, and catches anything
+      // added at this level later.
+      //
+      // The objection that once kept `dark` off this container — that it would
+      // drag the desktop sidebar in with it — doesn't apply, because the class
+      // is only ever present at widths where the sidebar is display:none.
+      //
+      // This overrides the rendered palette, not the stored preference: a theme
+      // chosen on desktop is still there on return.
+      className={cn("h-screen w-screen flex flex-col md:flex-row overflow-hidden", isMobile && "dark")}
       style={{ height: "100dvh", "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
     >
       {/* Shader Canvas.
