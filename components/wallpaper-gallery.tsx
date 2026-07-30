@@ -15,7 +15,7 @@ import { BurningImage } from "@/components/burning-image"
 import { ScanLineOverlay } from "@/components/scan-line-overlay"
 
 const galleryButtonClass =
-  "pointer-events-auto cursor-pointer rounded-full bg-background border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform] duration-150 active:scale-[0.97]"
+  "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform] duration-150 active:scale-[0.97]"
 
 interface WallpaperGalleryProps {
   images: CapturedImage[]
@@ -287,7 +287,7 @@ export function WallpaperGallery({
                     onClick={(e) => { e.stopPropagation(); handlePrevious() }}
                     variant="ghost"
                     size="icon"
-                    className={cn("absolute left-4 top-1/2 -translate-y-1/2 size-11", galleryButtonClass)}
+                    className={cn("absolute left-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
                     aria-label="Previous image"
                   >
                     <ChevronLeft className="size-4" strokeWidth={1.7} />
@@ -299,7 +299,7 @@ export function WallpaperGallery({
                     onClick={(e) => { e.stopPropagation(); handleNext() }}
                     variant="ghost"
                     size="icon"
-                    className={cn("absolute right-4 top-1/2 -translate-y-1/2 size-11", galleryButtonClass)}
+                    className={cn("absolute right-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
                     aria-label="Next image"
                   >
                     <ChevronRight className="size-4" strokeWidth={1.7} />
