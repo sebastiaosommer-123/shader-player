@@ -53,12 +53,21 @@ export function AppearanceControl({ layoutIdPrefix }: AppearanceControlProps) {
             and strong enough to define the track by itself — so the border is
             drawing the outline rather than standing in for a recess. */}
         <div
-          // 8px, matching the parameter sliders. Shape follows the surface, not
-          // the component type: this column is an 8px world, while the floating
-          // toolbar — where the shader tabs live — is entirely pills, down to
-          // the capture button. So the two segmented controls deliberately
-          // don't share a radius; they share everything else.
-          className="relative grid grid-cols-3 gap-1 rounded-[8px] border border-border bg-foreground/[0.06] p-1"
+          // 13px, derived rather than picked: the thumb is inset by 5px (1px
+          // border + 4px padding) and a concentric inner corner is
+          // `outer - inset`, so an 8px thumb — the parameter sliders' radius —
+          // needs a 13px track. Sizing the track to the thumb rather than the
+          // other way round is deliberate. At 8px the track lined up with the
+          // sliders but forced the thumb to 3px, which read square against a UI
+          // that is 8px chips and pills everywhere else; the thumb is the
+          // filled shape the eye actually lands on, so it wins.
+          //
+          // Shape still follows the surface, not the component type: this is a
+          // rounded rect because the sidebar is, while the shader tabs are a
+          // pill because the floating toolbar is pills down to the capture
+          // button. The two segmented controls share fill, shadow, morph and
+          // click — never a radius.
+          className="relative grid grid-cols-3 gap-1 rounded-[13px] border border-border bg-foreground/[0.06] p-1"
           role="radiogroup"
           aria-label="Appearance"
         >
@@ -76,7 +85,7 @@ export function AppearanceControl({ layoutIdPrefix }: AppearanceControlProps) {
                   // Only colour and transform transition here now — the fill and
                   // shadow moved onto the indicator, which animates by morphing
                   // rather than by cross-fading.
-                  "relative h-8 rounded-[3px] px-2 text-xs capitalize transition-[color,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none",
+                  "relative h-8 rounded-[8px] px-2 text-xs capitalize transition-[color,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none",
                   isSelected ? "text-foreground" : "text-muted-foreground hoverFine:text-foreground",
                 )}
               >
@@ -85,10 +94,9 @@ export function AppearanceControl({ layoutIdPrefix }: AppearanceControlProps) {
                     layoutId={prefersReducedMotion ? undefined : `${layoutIdPrefix}-appearance-tab`}
                     transition={spring.moderate}
                     aria-hidden
-                    // 3px, not 4: the thumb is inset by the 1px border as well
-                    // as the 4px of padding, so 8 - 5 is what keeps its corners
-                    // concentric with the track's.
-                    className={cn("absolute inset-0 rounded-[3px]", raised)}
+                    // 8px, the parameter sliders' radius. The 13px track above
+                    // is sized off this, not the reverse.
+                    className={cn("absolute inset-0 rounded-[8px]", raised)}
                   />
                 )}
                 {/* Above the indicator, which is painted into the same box. */}
