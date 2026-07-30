@@ -274,7 +274,7 @@ export function WallpaperGallery({
             className={cn("absolute top-4 right-4 size-11", galleryButtonClass)}
             aria-label="Close gallery"
           >
-            <X className="h-6 w-6" />
+            <X className="size-4" strokeWidth={1.7} />
           </Button>
         )}
 
@@ -287,10 +287,10 @@ export function WallpaperGallery({
                     onClick={(e) => { e.stopPropagation(); handlePrevious() }}
                     variant="ghost"
                     size="icon"
-                    className={cn("absolute left-4 top-1/2 -translate-y-1/2 h-12 w-12", galleryButtonClass)}
+                    className={cn("absolute left-4 top-1/2 -translate-y-1/2 size-11", galleryButtonClass)}
                     aria-label="Previous image"
                   >
-                    <ChevronLeft className="h-8 w-8" />
+                    <ChevronLeft className="size-4" strokeWidth={1.7} />
                   </Button>
                 )}
 
@@ -302,7 +302,7 @@ export function WallpaperGallery({
                     className={cn("absolute right-4 top-1/2 -translate-y-1/2 size-11", galleryButtonClass)}
                     aria-label="Next image"
                   >
-                    <ChevronRight className="h-8 w-8" />
+                    <ChevronRight className="size-4" strokeWidth={1.7} />
                   </Button>
                 )}
               </>
@@ -317,7 +317,7 @@ export function WallpaperGallery({
                   className={cn("size-11", galleryButtonClass)}
                   aria-label="Delete image"
                 >
-                  <Trash2 className="h-5 w-5" />
+                  <Trash2 className="size-4" strokeWidth={1.7} />
                 </Button>
                 <Button
                   onClick={(e) => { e.stopPropagation(); handleDownload() }}
@@ -327,7 +327,7 @@ export function WallpaperGallery({
                   style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
                   aria-label="Download image"
                 >
-                  <Download className="h-5 w-5" />
+                  <Download className="size-4" strokeWidth={1.7} />
                 </Button>
               </div>
             )}

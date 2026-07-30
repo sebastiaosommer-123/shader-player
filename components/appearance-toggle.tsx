@@ -61,18 +61,9 @@ export function AppearanceToggle() {
         // icon-only button that cycles gives a screen reader no other way to
         // know which of the three it is currently on.
         aria-label={mounted ? LABELS[current] : "Appearance"}
-        // 32px, not the 36px the sliders use: the credit line needs 206px of
-        // the sidebar's 247px, and a 36px button plus the gap tipped the row
-        // over into wrapping the text at the *default* width, not just the
-        // minimum. `shrink-0` keeps it square while the text reflows around it.
-        //
-        // `-mr-2` is optical alignment, not a nudge. The box is 32px around a
-        // 16px glyph, so sitting the box flush with the column left the mark
-        // 8px inside the right edge every slider and swatch above it lines up
-        // on. Pulling the box out by exactly its own padding puts the glyph on
-        // that edge while the 32px hit area survives; the hover fill bleeds
-        // into the sidebar's padding, which still leaves 8px to the frame.
-        className="-mr-2 shrink-0 flex size-8 items-center justify-center rounded-full text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hoverFine:text-foreground hoverFine:bg-foreground/[0.06] active:scale-[0.97] motion-reduce:transition-none"
+        // The negative margin preserves the 16px glyph's right-edge alignment
+        // while allowing the circular hit target to grow to 44px.
+        className="-mr-[14px] shrink-0 flex size-11 items-center justify-center rounded-full text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hoverFine:text-foreground hoverFine:bg-foreground/[0.06] active:scale-[0.97] motion-reduce:transition-none"
       >
         {/* The icon swaps rather than morphs — three unrelated glyphs have no
             shared shape to tween — so it cross-fades on a short rise. */}
@@ -85,7 +76,7 @@ export function AppearanceToggle() {
             transition={spring.fast}
             className="flex"
           >
-            <Icon className="size-4" />
+            <Icon className="size-4" strokeWidth={1.7} />
           </motion.span>
         </AnimatePresence>
       </button>
