@@ -72,7 +72,7 @@ export function AppearanceToggle() {
         // on. Pulling the box out by exactly its own padding puts the glyph on
         // that edge while the 32px hit area survives; the hover fill bleeds
         // into the sidebar's padding, which still leaves 8px to the frame.
-        className="-mr-2 shrink-0 flex size-8 items-center justify-center rounded-[8px] text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hoverFine:text-foreground hoverFine:bg-foreground/[0.06] active:scale-[0.97] motion-reduce:transition-none"
+        className="-mr-2 shrink-0 flex size-8 items-center justify-center rounded-full text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hoverFine:text-foreground hoverFine:bg-foreground/[0.06] active:scale-[0.97] motion-reduce:transition-none"
       >
         {/* The icon swaps rather than morphs — three unrelated glyphs have no
             shared shape to tween — so it cross-fades on a short rise. */}
