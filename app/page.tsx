@@ -24,7 +24,7 @@ export default function Home() {
   // Mobile is dark-only, so the palette is pinned at the root rather than
   // scoped piecemeal below it. See the note on the container's className.
   const isMobile = useIsMobile()
-  const { width: sidebarWidth, isResizing, startResize } = useResizableSidebar()
+  const { isResizing, startResize } = useResizableSidebar()
   const [params, setParams] = useState<ShaderParams>(getShaderConfig("terracotta").defaultParams)
 
   const [capturedImages, setCapturedImages] = useState<CapturedImage[]>([])
@@ -126,9 +126,12 @@ export default function Home() {
     // a class swap so browsers without dvh drop the declaration and fall back
     // to h-screen instead of collapsing.
     //
-    // --sidebar-width is published here so the sidebar and anything that has to
-    // line up with it (the capture button) read one value; the canvas just takes
-    // whatever flex-1 leaves over.
+    // --sidebar-width is deliberately not set here. The server cannot know the
+    // stored width, so emitting it would paint the default and then correct
+    // itself — and an inline value on this element would also outrank the one
+    // the boot script has already put on the document. It lives on the document
+    // element instead, seeded pre-paint and maintained by useResizableSidebar;
+    // the canvas just takes whatever flex-1 leaves over.
     <div
       // `dark` on the root below md, which is the one place it can go and cover
       // everything: mobile has no light mode at all. The bar, the sheet and the
@@ -145,7 +148,7 @@ export default function Home() {
       // This overrides the rendered palette, not the stored preference: a theme
       // chosen on desktop is still there on return.
       className={cn("h-screen w-screen flex flex-col md:flex-row overflow-hidden", isMobile && "dark")}
-      style={{ height: "100dvh", "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
+      style={{ height: "100dvh" } as CSSProperties}
     >
       {/* Shader Canvas.
           Two elements on purpose: the rounded corners reveal whatever is painted

@@ -1,15 +1,17 @@
 "use client"
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react"
+import {
+  DEFAULT_SIDEBAR_WIDTH,
+  SIDEBAR_WIDTH_STORAGE_KEY,
+  clampSidebarWidth as clamp,
+} from "@/lib/sidebar-width"
 
-const MIN_WIDTH = 275
-const MAX_WIDTH = 400
-export const DEFAULT_SIDEBAR_WIDTH = 280
-const STORAGE_KEY = "shader-player:sidebar-width"
+export { DEFAULT_SIDEBAR_WIDTH }
 
 function loadWidth(): number | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY)
     if (raw === null) return null
     const parsed = Number.parseFloat(raw)
     return Number.isFinite(parsed) ? parsed : null
@@ -20,34 +22,39 @@ function loadWidth(): number | null {
 
 function saveWidth(width: number) {
   try {
-    localStorage.setItem(STORAGE_KEY, String(width))
+    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(width))
   } catch {
     // Private mode / disabled storage: the width just won't survive a reload.
   }
-}
-
-function clamp(width: number) {
-  return Math.min(Math.max(width, MIN_WIDTH), MAX_WIDTH)
 }
 
 /**
  * Width of the desktop controls sidebar, dragged from its inner edge.
  *
  * The width lives here rather than in CSS alone so it can be clamped and
- * persisted; page.tsx publishes it as `--sidebar-width` and everything that
- * needs to line up with the sidebar reads that variable.
+ * persisted. It reaches the page as `--sidebar-width` on the document element,
+ * seeded before first paint by SIDEBAR_WIDTH_BOOT_SCRIPT and kept in step by
+ * this hook; everything that has to line up with the sidebar reads it there.
  */
 export function useResizableSidebar() {
-  // Starts at the default so server and first client render agree — the stored
-  // value is applied in a layout effect, before the browser paints.
-  const [width, setWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
+  // Read straight from storage rather than starting at the default and
+  // correcting later. The value is never rendered into markup — it only drives
+  // the custom property below — so there is nothing for the server and client
+  // to disagree about, and starting at the default would have this hook's
+  // first write clobber the width the boot script already painted.
+  const [width, setWidth] = useState(() =>
+    typeof window === "undefined" ? DEFAULT_SIDEBAR_WIDTH : clamp(loadWidth() ?? DEFAULT_SIDEBAR_WIDTH),
+  )
   const [isResizing, setIsResizing] = useState(false)
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
+  // Same property the boot script seeds, same element. Writing it here rather
+  // than rendering it into a style attribute is what keeps the server's HTML
+  // free of a width it cannot know — the markup carries none, so the script's
+  // value survives until this takes over.
   useLayoutEffect(() => {
-    const saved = loadWidth()
-    if (saved !== null) setWidth(clamp(saved))
-  }, [])
+    document.documentElement.style.setProperty("--sidebar-width", `${width}px`)
+  }, [width])
 
   const startResize = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {

@@ -4,6 +4,7 @@ import { Space_Mono } from "next/font/google"
 import "./globals.css"
 import { AudioInitializer } from "@/components/audio-initializer"
 import { ThemeProvider } from "@/components/theme-provider"
+import { SIDEBAR_WIDTH_BOOT_SCRIPT } from "@/lib/sidebar-width"
 
 const spaceMono = Space_Mono({
   weight: ["400", "700"],
@@ -36,6 +37,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={spaceMono.variable}>
+        {/* First thing in the body so it executes before the markup below is
+            parsed, which is what lets the stored sidebar width be in place for
+            the very first paint instead of one paint late. */}
+        <script dangerouslySetInnerHTML={{ __html: SIDEBAR_WIDTH_BOOT_SCRIPT }} />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AudioInitializer />
           {children}
