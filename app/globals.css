@@ -53,6 +53,13 @@
   --surface-6: #FFFFFF;
   --surface-7: #FFFFFF;
   --surface-8: #FFFFFF;
+  /* The two squares of the transparency checkerboard, behind the alpha slider
+     and the colour tiles. Referenced from color-picker.tsx; they sit beside a
+     linear-gradient in the same `background-image`, and an unresolved var()
+     there is invalid at computed-value time — which drops the whole
+     declaration, gradient included, not just the checker layer. */
+  --checker-a: #FFFFFF;
+  --checker-b: #E3E3E3;
   --shadow-color: rgb(0 0 0 / 0.06);
   --shadow-1: 0 0 0 1px var(--shadow-color);
   --shadow-2: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color);
@@ -111,6 +118,11 @@
   --surface-6: #3A3A3A;
   --surface-7: #414141;
   --surface-8: #484848;
+  /* Two steps of the dark ramp rather than the light checker inverted: the
+     picker floats on an elevated panel here, so a white/grey checker would
+     read as a hole punched through it. */
+  --checker-a: #2C2C2C;
+  --checker-b: #3D3D3D;
   --dm-hi-base: rgba(255,255,255,0.01);
   --dm-hi-mid: rgba(255,255,255,0.02);
   --dm-hi-high: rgba(255,255,255,0.04);
