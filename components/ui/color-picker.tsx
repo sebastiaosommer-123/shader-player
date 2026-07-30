@@ -595,7 +595,13 @@ function HueSlider({ h, onChange }: { h: number; onChange: (h: number) => void }
       trackStyle={{
         background:
           "linear-gradient(to right, hsl(0,100%,50%), hsl(60,100%,50%), hsl(120,100%,50%), hsl(180,100%,50%), hsl(240,100%,50%), hsl(300,100%,50%), hsl(360,100%,50%))",
-        borderColor: "transparent",
+        // `borderWidth: 0`, matching AlphaSlider — not `borderColor:
+        // transparent`, which was hiding the border while keeping its 1px in
+        // the box. That shrank the padding box the gradient paints into, so
+        // the ramp stopped 1px short of the pill and took a tighter corner
+        // than the checkerboard sitting directly under it, at the same outer
+        // size.
+        borderWidth: 0,
       }}
       aria-label="Hue"
     />
