@@ -1130,10 +1130,27 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
       width: number;
       snappedValue: number;
       cursorX: number;
+      // Carried out of computeHoverPreview so the tooltip can be clamped to the
+      // track without reading a ref back during render.
+      trackWidth: number;
     } | null>(null);
     const [showHoverTooltip, setShowHoverTooltip] = useState(false);
     const hoverDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const shape = useShape();
+
+    // Half the hover tooltip's rendered width, measured rather than assumed:
+    // it holds whatever `formatValue` returns, so its width changes with the
+    // digit count. Measured in an effect, which runs after the first paint —
+    // harmless here because that paint is the tooltip's `opacity: 0` enter
+    // frame, so the unclamped position is never visible.
+    const tooltipRef = useRef<HTMLDivElement>(null);
+    const [tooltipHalf, setTooltipHalf] = useState(0);
+    useEffect(() => {
+      const el = tooltipRef.current;
+      if (!el) return;
+      const half = el.offsetWidth / 2;
+      setTooltipHalf((prev) => (Math.abs(prev - half) > 0.5 ? half : prev));
+    }, [hoverPreview?.snappedValue, showHoverTooltip]);
 
     // Show hover tooltip after 100ms delay
     useEffect(() => {
@@ -1243,7 +1260,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         const edgeX = snappedVal === min ? 0 : snappedVal === max ? w : snappedX;
         const left = Math.min(handleX, edgeX);
         const width = Math.abs(edgeX - handleX);
-        setHoverPreview({ left, width, snappedValue: snappedVal, cursorX: snappedX });
+        setHoverPreview({ left, width, snappedValue: snappedVal, cursorX: snappedX, trackWidth: w });
       },
       [variant, pipSteps, pipCount, min, max, step, fillPercent, zeroOffset]
     );
@@ -1389,6 +1406,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         <AnimatePresence>
           {hoverPreview && showHoverTooltip && !isPressed && (
             <motion.div
+              ref={tooltipRef}
               key="hover-tooltip"
               className="absolute -translate-x-1/2 pointer-events-none z-20"
               initial={{ opacity: 0, y: 4 }}
@@ -1396,7 +1414,17 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
               exit={{ opacity: 0, y: 4, transition: spring.fast.exit }}
               transition={spring.fast}
               style={{
-                left: hoverPreview.cursorX,
+                // Clamped to the track, not centred on the cursor outright.
+                // The sidebar's scroll container computes `overflow-x: auto`
+                // from its `overflow-y-auto` — CSS gives no way back to
+                // `visible` — so anything reaching past the track's edge is
+                // cut off rather than overlaying the canvas. At the extremes
+                // the tooltip stops following the cursor and parks flush
+                // instead, which is what every collision-aware tooltip does.
+                left: Math.min(
+                  Math.max(hoverPreview.cursorX, tooltipHalf),
+                  Math.max(tooltipHalf, hoverPreview.trackWidth - tooltipHalf)
+                ),
                 top: -30,
               }}
             >
