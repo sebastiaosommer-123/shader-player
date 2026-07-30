@@ -4,7 +4,6 @@ import type { ShaderParams } from "@/lib/shader-uniforms"
 import { ParameterGroup } from "./parameter-group"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { CreditsFooter } from "./credits-footer"
-import { AppearanceControl } from "./appearance-control"
 
 interface ControlsSidebarProps {
   params: ShaderParams
@@ -72,9 +71,10 @@ export function ControlsSidebar({
             />
           ))}
 
-          <div className="mt-auto space-y-4">
-            <AppearanceControl layoutIdPrefix="desktop" />
-            <CreditsFooter />
+          {/* Appearance lives in the credits row now, as a single cycling icon
+              rather than its own labelled section. */}
+          <div className="mt-auto">
+            <CreditsFooter showAppearanceToggle />
           </div>
         </div>
       </div>

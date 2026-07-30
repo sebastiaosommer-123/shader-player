@@ -5,7 +5,6 @@ import { getShaderConfig } from "@/lib/shader-configs"
 import { X } from "lucide-react"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { CreditsFooter } from "./credits-footer"
-import { AppearanceControl } from "./appearance-control"
 import { useReducedMotion } from "framer-motion"
 
 interface ControlsSheetProps {
@@ -82,13 +81,11 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId 
             />
           ))}
 
-          {/* The appearance control is here for parity with the sidebar, but
-              note it has no visible effect from inside this sheet: the mobile
-              bar and this sheet are both pinned `dark`, and the rest of the
-              screen is the shader canvas, which doesn't read the theme. What it
-              sets is the theme the desktop layout will open with. */}
-          <div className="mt-auto space-y-4">
-            <AppearanceControl layoutIdPrefix="mobile" />
+          {/* No appearance control: this sheet and the bar behind it are both
+              pinned `dark`, so the only thing the setting still reaches from
+              here is the wallpaper gallery — not enough to justify a control
+              that can't show its own effect. */}
+          <div className="mt-auto">
             <CreditsFooter />
           </div>
         </div>
