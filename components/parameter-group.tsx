@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ChevronRight } from "lucide-react"
 import type { ShaderParameterGroup } from "@/lib/shader-configs"
 import type { ShaderParams } from "@/lib/shader-uniforms"
@@ -33,7 +33,24 @@ export function ParameterGroup({ group, params, onChange, shaderId, spacing = "n
   // the animation also eats the first slider's hover tooltip, which sits 30px
   // above the slider and so pokes out of the top of an open group. Clip only
   // while the height is actually moving.
-  const [animating, setAnimating] = useState(false)
+  //
+  // Starts `true`, so the clip is in the server-rendered markup. The class that
+  // runs the open animation lives in the stylesheet, and its keyframe begins at
+  // `height: 0` — so the animation plays before any JS does. Starting `false`
+  // meant those pre-hydration frames had full-height content in a zero-height
+  // box with nothing clipping it, and every group painted over its neighbours
+  // until hydration fired animationstart.
+  const [animating, setAnimating] = useState(true)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  // Release that initial clip once hydrated, if nothing is actually running.
+  // The animation may have finished before React arrived, or `motion-reduce`
+  // may have suppressed it outright — in both cases no animationend is coming
+  // to clear the flag, and the clip would otherwise be permanent.
+  useEffect(() => {
+    const el = contentRef.current
+    if (el && el.getAnimations().length === 0) setAnimating(false)
+  }, [])
 
   const handleToggle = () => {
     playDigitalClick("weak")
@@ -57,6 +74,7 @@ export function ParameterGroup({ group, params, onChange, shaderId, spacing = "n
           they read both ship with tw-animate-css, so the height animation needs
           no CSS of its own. */}
       <CollapsibleContent
+        ref={contentRef}
         // Only this element's own collapse animation counts; animation events
         // from anything inside bubble up here too.
         onAnimationStart={(e) => {
