@@ -1413,7 +1413,20 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
       <motion.div
         ref={mergedRef}
         className={cn(
-          "relative w-full h-8 select-none touch-none border border-border bg-muted/30 overflow-hidden outline-offset-2",
+          // The hairline is an inset ring, not a border, so the fill can cover
+          // it. A border sits outside the padding box while the fill is
+          // `absolute left-0 top-0 bottom-0` — positioned against that box and
+          // clipped to it by `overflow-hidden` — so no child could ever reach
+          // the border to paint over it. An inset shadow paints above the
+          // background but below descendants, which puts the ring under the
+          // fill exactly where there is fill and leaves it visible over the
+          // empty part of the track.
+          //
+          // Dropping the border also grows the padding box by 2px under
+          // `box-sizing: border-box`, so the fill now runs flush to the outer
+          // edge and takes the full corner radius rather than a 1px-tighter
+          // one. The outer size is unchanged.
+          "relative w-full h-8 select-none touch-none shadow-[inset_0_0_0_1px_var(--border)] bg-muted/30 overflow-hidden outline-offset-2",
           variant === "scrubber"
             ? "flex items-center gap-3 px-4 cursor-ew-resize"
             : "cursor-ew-resize",
