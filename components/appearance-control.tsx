@@ -46,17 +46,19 @@ export function AppearanceControl({ layoutIdPrefix }: AppearanceControlProps) {
       <div className="h-px bg-border -mx-4 mb-4" />
       <div className="space-y-2">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">Appearance</div>
-        {/* No border: the shader tabs' track has none, and with the fill below
-            doing the work it was drawing a second edge around an element that
-            already reads as a recess. The fill has to carry it alone, which is
-            why this is `foreground/6%` — the shader tabs' token — and not the
-            old `muted/40`, which was faint enough in light mode that the border
-            was the only thing defining the track at all. */}
+        {/* Bordered, unlike the shader tabs. Those sit on a floating bar that
+            already has an edge of its own; this one sits flat in the sidebar
+            column, where the border is what separates it from the surrounding
+            surface. The fill is still `foreground/6%` — the shader tabs' token,
+            and strong enough to define the track by itself — so the border is
+            drawing the outline rather than standing in for a recess. */}
         <div
-          // 8px to match the parameter sliders, which is the other rectangular
-          // control in this column — the shader tabs' pill shape doesn't
-          // transfer to word labels.
-          className="relative grid grid-cols-3 gap-1 rounded-[8px] bg-foreground/[0.06] p-1"
+          // 8px, matching the parameter sliders. Shape follows the surface, not
+          // the component type: this column is an 8px world, while the floating
+          // toolbar — where the shader tabs live — is entirely pills, down to
+          // the capture button. So the two segmented controls deliberately
+          // don't share a radius; they share everything else.
+          className="relative grid grid-cols-3 gap-1 rounded-[8px] border border-border bg-foreground/[0.06] p-1"
           role="radiogroup"
           aria-label="Appearance"
         >
@@ -74,7 +76,7 @@ export function AppearanceControl({ layoutIdPrefix }: AppearanceControlProps) {
                   // Only colour and transform transition here now — the fill and
                   // shadow moved onto the indicator, which animates by morphing
                   // rather than by cross-fading.
-                  "relative h-8 rounded-[4px] px-2 text-xs capitalize transition-[color,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none",
+                  "relative h-8 rounded-[3px] px-2 text-xs capitalize transition-[color,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none",
                   isSelected ? "text-foreground" : "text-muted-foreground hoverFine:text-foreground",
                 )}
               >
@@ -83,9 +85,10 @@ export function AppearanceControl({ layoutIdPrefix }: AppearanceControlProps) {
                     layoutId={prefersReducedMotion ? undefined : `${layoutIdPrefix}-appearance-tab`}
                     transition={spring.moderate}
                     aria-hidden
-                    // The shell is 8px with 4px of padding, so the thumb has to
-                    // sit 4px tighter to stay concentric.
-                    className={cn("absolute inset-0 rounded-[4px]", raised)}
+                    // 3px, not 4: the thumb is inset by the 1px border as well
+                    // as the 4px of padding, so 8 - 5 is what keeps its corners
+                    // concentric with the track's.
+                    className={cn("absolute inset-0 rounded-[3px]", raised)}
                   />
                 )}
                 {/* Above the indicator, which is painted into the same box. */}
