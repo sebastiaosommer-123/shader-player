@@ -31,10 +31,12 @@ export function ControlsSidebar({
     // scroll lives on the inner column, not here — `overflow-y-auto` computes
     // `overflow-x` to `auto` too, which would clip the half of the grip that
     // hangs outside this box.
-    <div className="relative w-[var(--sidebar-width,280px)] shrink-0 h-full bg-background border-l border-border flex flex-col">
-      {/* Resize grip. A 6px strip straddling the border gives the pointer
-          something to catch; the 1px line inside is the visible part, tinted
-          only on hover and while dragging so the border reads as usual at rest. */}
+    <div className="relative w-[var(--sidebar-width,280px)] shrink-0 h-full bg-background flex flex-col">
+      {/* Resize grip. A 6px strip gives the pointer something to catch; the 1px
+          line inside is the visible part. With no border here any more, that
+          line is the only seam this edge ever draws — transparent at rest, so
+          the panel meets the canvas on its own colour change, and tinted only
+          while hovered or dragged. */}
       <div
         onPointerDown={onResizeStart}
         aria-hidden

@@ -2,7 +2,7 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react"
 
-const MIN_WIDTH = 200
+const MIN_WIDTH = 275
 const MAX_WIDTH = 400
 export const DEFAULT_SIDEBAR_WIDTH = 280
 const STORAGE_KEY = "shader-player:sidebar-width"
