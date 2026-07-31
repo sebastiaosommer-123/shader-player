@@ -11,6 +11,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.6.0
         version: 1.6.0(@date-fns/tz@1.2.0)(@types/react@19.2.14)(date-fns@4.1.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@blossom-carousel/react':
+        specifier: ^1.5.2
+        version: 1.5.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@hookform/resolvers':
         specifier: ^3.10.0
         version: 3.10.0(react-hook-form@7.71.1(react@19.2.0))
@@ -230,6 +233,19 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  '@blossom-carousel/core@1.1.8':
+    resolution: {integrity: sha512-f3/7jS/Ga63N0X7goVkPs0KafSe463y9w4+zE9ZyacjMCT0VSpAQuCQrOpyfyDJ23EONPHgpEyHtscHoRbtGTg==}
+
+  '@blossom-carousel/react@1.5.2':
+    resolution: {integrity: sha512-RhEZpxLmNtjTycieq1cR4E6Ko/iT2Oq2HLSmUu4ZCDeLypjn+I5egRDaf+ZDEZB8114DuB51YuD053wF6S57Ng==}
+    peerDependencies:
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
+
+  '@bramus/style-observer@2.0.2':
+    resolution: {integrity: sha512-oRKamZ9Z637pAZgNGJIbNGiFoYQSeA47PpU4K8hXZq9lQcPu35BCqMG9d9J/ab2CB/0XlXq6ToMnVhHF8mLNqg==}
+    engines: {node: '>=12'}
 
   '@date-fns/tz@1.2.0':
     resolution: {integrity: sha512-LBrd7MiJZ9McsOgxqWX7AaxrDjcFVjWH/tIKJd7pnR7McaslGYOP1QmmiBXdJH/H/yLCT+rcQ7FaPBUxRGUtrg==}
@@ -1857,6 +1873,18 @@ snapshots:
       use-sync-external-store: 1.6.0(react@19.2.0)
     optionalDependencies:
       '@types/react': 19.2.14
+
+  '@blossom-carousel/core@1.1.8':
+    dependencies:
+      '@bramus/style-observer': 2.0.2
+
+  '@blossom-carousel/react@1.5.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
+    dependencies:
+      '@blossom-carousel/core': 1.1.8
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
+
+  '@bramus/style-observer@2.0.2': {}
 
   '@date-fns/tz@1.2.0': {}
 

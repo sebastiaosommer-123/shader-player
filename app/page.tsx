@@ -211,6 +211,7 @@ export default function Home() {
             onDeleteStart={handleDeleteStart}
             initialIndex={selectedImageIndex}
             openedImageId={clickedImageId}
+            isMobile={isMobile}
           />
         )}
       </AnimatePresence>

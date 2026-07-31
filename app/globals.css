@@ -347,6 +347,105 @@ input[type="range"]::-moz-range-thumb {
   animation: overlay-fade-out 150ms ease-out;
 }
 
+/* Gallery carousel — one capture per screen, snapped, swipeable. The image
+   inside each slide is driven by the scroll position rather than by a clock, so
+   it tracks a half-finished swipe and reverses with it. */
+.gallery-carousel {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  height: 100%;
+  scroll-snap-type: x mandatory;
+  /* html and body carry touch-action: none below to kill the page bounce on
+     mobile. Naming the one axis we do want keeps the swipe alive inside it. */
+  touch-action: pan-x;
+}
+
+.gallery-slide {
+  position: relative;
+  overflow: hidden;
+  scroll-snap-align: center;
+}
+
+/* The parallax transform's own element. The image below it belongs to Framer
+   for the length of the gallery morph, and two writers on one transform is a
+   fight — the same separation the thumbnail morph already relies on. */
+.gallery-card {
+  position: absolute;
+  inset: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The @supports guard is load-bearing, not politeness. With animation-timeline
+     unsupported, `animation: gallery-parallax linear both` falls back to the
+     document timeline at a zero duration, and the `both` fill mode then pins
+     every card on the 100% keyframe — every capture shoved 12% off its slide,
+     permanently. Firefox still ships scroll-driven animations behind a flag, so
+     this is a live path. Guarded, it gets a plain snap carousel instead. */
+  @supports (animation-timeline: view()) {
+    .gallery-slide {
+      view-timeline: --gallery-slide inline;
+    }
+
+    .gallery-card {
+      animation: gallery-parallax linear both;
+      animation-timeline: --gallery-slide;
+      animation-range: cover;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Blossom's own stylesheet puts scroll-behavior: smooth on every scroller. */
+  .gallery-carousel {
+    scroll-behavior: auto;
+  }
+}
+
+/* Held while the thumbnail morphs in or out. A settled slide sits on the 50%
+   keyframe — an identity transform — so the morph usually has nothing to fight;
+   this is for closing mid-scroll, where the active card would otherwise still be
+   offset underneath Framer's measurement. */
+.gallery-carousel[data-morphing="true"] .gallery-card {
+  animation: none;
+  transform: none;
+}
+
+/* linear is correct here and is not the usual easing mistake: the driver is
+   scroll offset, not time — the user's finger supplies the easing.
+
+   ±50% is the full-strength range, and it is safe for a reason worth writing
+   down: the displacement is always cancelled by how much of the slide is off
+   screen. A slide is exactly one scrollport wide, so at scroll progress p its
+   visible region is the leading 2p of it, while the card sits at (p - 0.5) of a
+   slide width. Those two lines meet exactly at p = 0.5 and the card leads
+   everywhere else — so the empty half the transform opens up is always the half
+   already past the edge. Nothing is cropped and nothing is stretched.
+
+   This held at 12% too. That number came from measuring the letterbox gutter
+   either side of a contained capture and never travelling past it, which is a
+   real constraint for a still image but the wrong one here: below p = 0.375 the
+   image covers the whole visible region regardless, and above it the gutters
+   simply narrow symmetrically back to rest. Capping travel at the gutter bought
+   nothing and cost the effect — 12% of drift against a slide moving 100% is
+   invisible.
+
+   Load-bearing, so it does not get quietly broken later: grid-auto-columns:100%
+   on the scroller. Let a slide be narrower than the scrollport — peeking
+   neighbours, a two-up grid — and there is a stretch of scroll where the whole
+   slide is on screen, where any offset at all is a visible gap. */
+@keyframes gallery-parallax {
+  0% {
+    transform: translateX(-50%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(50%);
+  }
+}
+
 @custom-variant hoverFine {
   @media (hover: hover) and (pointer: fine) {
     &:hover {

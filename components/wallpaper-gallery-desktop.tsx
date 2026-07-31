@@ -1,0 +1,347 @@
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import { flushSync } from "react-dom"
+import { motion, useIsPresent, useReducedMotion } from "framer-motion"
+import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import type { CapturedImage } from "@/lib/types"
+import { downloadImage } from "@/lib/canvas-capture"
+import { playDigitalClick } from "@/lib/audio-feedback"
+import { playDownloadConfirmation } from "@/lib/download-audio"
+import { galleryMorph } from "@/lib/springs"
+import { cn } from "@/lib/utils"
+import { BurningImage } from "@/components/burning-image"
+import { ScanLineOverlay } from "@/components/scan-line-overlay"
+
+const galleryButtonClass =
+  "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform] duration-150 active:scale-[0.97]"
+
+interface WallpaperGalleryProps {
+  images: CapturedImage[]
+  onClose: () => void
+  onDelete: (id: string) => void
+  onDeleteStart?: (id: string) => void
+  initialIndex?: number
+  openedImageId: string
+}
+
+export function WallpaperGalleryDesktop({
+  images,
+  onClose,
+  onDelete,
+  onDeleteStart,
+  initialIndex = 0,
+  openedImageId,
+}: WallpaperGalleryProps) {
+  const reversedImages = [...images].reverse()
+
+  const [currentIndex, setCurrentIndex] = useState(initialIndex)
+  const [imageVisible, setImageVisible] = useState(true)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isBurnReady, setIsBurnReady] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
+  const [slideX, setSlideX] = useState(0)
+  const [slideTransition, setSlideTransition] = useState(true)
+  const isNavigatingRef = useRef(false)
+
+  const prefersReducedMotion = useReducedMotion()
+  // Flips false the instant AnimatePresence starts removing us — long before it
+  // actually unmounts us, which it will not do until the fades below finish.
+  // See the shared-element container's own comment for why that matters.
+  const isPresent = useIsPresent()
+
+  useEffect(() => {
+    if (currentIndex >= reversedImages.length && reversedImages.length > 0) {
+      setCurrentIndex(reversedImages.length - 1)
+    } else if (reversedImages.length === 0) {
+      onClose()
+    }
+  }, [reversedImages.length, currentIndex, onClose])
+
+  useEffect(() => {
+    if (!isNavigatingRef.current) {
+      setImageVisible(true)
+      setSlideX(0)
+      setSlideTransition(true)
+      setIsDeleting(false)
+      setIsBurnReady(false)
+      setIsScanning(false)
+    }
+  }, [currentIndex])
+
+  const currentImage = reversedImages[currentIndex]
+  if (!currentImage) return null
+
+  const handlePrevious = () => {
+    playDigitalClick("strong")
+    if (prefersReducedMotion) {
+      setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reversedImages.length - 1))
+      return
+    }
+    isNavigatingRef.current = true
+    setSlideTransition(true)
+    setSlideX(30)
+    setImageVisible(false)
+    setTimeout(() => {
+      flushSync(() => {
+        setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reversedImages.length - 1))
+        setSlideTransition(false)
+        setSlideX(-30)
+      })
+      setTimeout(() => {
+        setSlideTransition(true)
+        setSlideX(0)
+        setImageVisible(true)
+        setTimeout(() => { isNavigatingRef.current = false }, 250)
+      }, 16)
+    }, 150)
+  }
+
+  const handleNext = () => {
+    playDigitalClick("strong")
+    if (prefersReducedMotion) {
+      setCurrentIndex((prev) => (prev < reversedImages.length - 1 ? prev + 1 : 0))
+      return
+    }
+    isNavigatingRef.current = true
+    setSlideTransition(true)
+    setSlideX(-30)
+    setImageVisible(false)
+    setTimeout(() => {
+      flushSync(() => {
+        setCurrentIndex((prev) => (prev < reversedImages.length - 1 ? prev + 1 : 0))
+        setSlideTransition(false)
+        setSlideX(30)
+      })
+      setTimeout(() => {
+        setSlideTransition(true)
+        setSlideX(0)
+        setImageVisible(true)
+        setTimeout(() => { isNavigatingRef.current = false }, 250)
+      }, 16)
+    }, 150)
+  }
+
+  const handleDownload = () => {
+    playDigitalClick("strong")
+    if (!currentImage) return
+    if (prefersReducedMotion) {
+      downloadImage(currentImage.dataUrl, currentImage.params as any, currentImage.timestamp)
+      playDownloadConfirmation("strong")
+      return
+    }
+    setIsScanning(true)
+  }
+
+  const handleDelete = () => {
+    playDigitalClick("strong")
+    if (currentImage) {
+      if (prefersReducedMotion) {
+        onDeleteStart?.(currentImage.id)
+        onDelete(currentImage.id)
+        return
+      }
+      setIsDeleting(true)
+      onDeleteStart?.(currentImage.id)
+    }
+  }
+
+  const handleBurnReady = () => setIsBurnReady(true)
+
+  const handleBurnComplete = () => {
+    if (currentImage) {
+      setImageVisible(false)
+      onDelete(currentImage.id)
+      const newLength = reversedImages.length - 1
+      if (newLength === 0) {
+        setTimeout(() => onClose(), 150)
+      } else if (currentIndex >= newLength) {
+        setCurrentIndex(newLength - 1)
+      }
+      setIsDeleting(false)
+      setIsBurnReady(false)
+      setTimeout(() => setImageVisible(true), 50)
+    }
+  }
+
+  const handleClose = () => {
+    playDigitalClick("strong")
+    onClose()
+  }
+
+  const handleScanComplete = () => {
+    if (currentImage) {
+      downloadImage(currentImage.dataUrl, currentImage.params as any, currentImage.timestamp)
+      playDownloadConfirmation("strong")
+      setIsScanning(false)
+    }
+  }
+
+  const displayCount = isDeleting ? Math.max(0, reversedImages.length - 1) : reversedImages.length
+
+  const reducedTransition = { duration: 0.15, ease: "easeInOut" as const }
+  const morphTransition = prefersReducedMotion ? reducedTransition : galleryMorph
+
+  return (
+    <div className="fixed inset-0 z-50">
+      {/* Background — fades in/out independently */}
+      <motion.div
+        className="fixed inset-0 bg-background"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={prefersReducedMotion ? reducedTransition : { duration: 0.25, ease: "easeOut" }}
+      />
+
+      {/* Image container — shared element transition from thumbnail.
+          Dropped the moment the close begins rather than when AnimatePresence
+          finally unmounts us. Framer can only hand the layoutId back to the
+          thumbnail once this node is gone, and AnimatePresence holds the whole
+          subtree alive until the slowest exit below finishes — which used to
+          mean a quarter-second of the image sitting fullscreen while the
+          backdrop dissolved off it, and only then a collapse. Now the collapse
+          starts on the click frame and those fades run alongside it. */}
+      {isPresent && (
+        <motion.div
+          layoutId={`gallery-container-${openedImageId}`}
+          // bg-background so the letterbox either side of the capture is opaque
+          // rather than a window onto the app still fading out behind it.
+          className="fixed inset-0 overflow-hidden bg-background md:inset-8"
+          style={{ borderRadius: 0 }}
+          transition={morphTransition}
+          onClick={handleClose}
+        >
+          {currentImage && (
+            // The prev/next slide rides on this wrapper, not on the image
+            // itself. The image is a projection node now, so Framer owns its
+            // transform for the length of the morph; a second transform on the
+            // same element would be overwritten mid-flight and fight the spring.
+            <div
+              className="absolute inset-0"
+              style={
+                prefersReducedMotion
+                  ? { opacity: imageVisible ? 1 : 0, transition: "opacity 150ms ease-in-out" }
+                  : {
+                      opacity: isBurnReady ? 0 : imageVisible ? 1 : 0,
+                      transform: `translateX(${slideX}px)`,
+                      transition: slideTransition
+                        ? "transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out"
+                        : "none",
+                    }
+              }
+            >
+              {/* Sized to the letterboxed rect rather than stretched across the
+                  container and left to object-contain: this is the box the morph
+                  scales from, and the thumbnail's is in the same proportion, so
+                  the flight stays a uniform scale. */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <motion.img
+                  layoutId={`gallery-image-${openedImageId}`}
+                  transition={morphTransition}
+                  src={currentImage.dataUrl || "/placeholder.svg"}
+                  alt={`Captured frame ${currentIndex + 1}`}
+                  className="max-h-full max-w-full"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+          )}
+
+          {isDeleting && currentImage && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <BurningImage src={currentImage.dataUrl} onComplete={handleBurnComplete} onReady={handleBurnReady} />
+            </div>
+          )}
+
+          {isScanning && currentImage && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <ScanLineOverlay src={currentImage.dataUrl} onComplete={handleScanComplete} />
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* UI controls — fade in after image settles */}
+      <motion.div
+        className="fixed inset-0 pointer-events-none"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0, transition: { duration: 0.18, delay: 0 } }}
+        transition={
+          prefersReducedMotion
+            ? reducedTransition
+            : { duration: 0.18, delay: 0.3, ease: "easeOut" }
+        }
+      >
+        {displayCount > 0 && (
+          <Button
+            onClick={(e) => { e.stopPropagation(); handleClose() }}
+            variant="ghost"
+            size="icon"
+            className={cn("absolute top-4 right-4 size-11", galleryButtonClass)}
+            aria-label="Close gallery"
+          >
+            <X className="size-4" strokeWidth={1.7} />
+          </Button>
+        )}
+
+        {currentImage && (
+          <>
+            {reversedImages.length > 1 && (
+              <>
+                {currentIndex > 0 && (
+                  <Button
+                    onClick={(e) => { e.stopPropagation(); handlePrevious() }}
+                    variant="ghost"
+                    size="icon"
+                    className={cn("absolute left-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft className="size-4" strokeWidth={1.7} />
+                  </Button>
+                )}
+
+                {currentIndex < reversedImages.length - 1 && (
+                  <Button
+                    onClick={(e) => { e.stopPropagation(); handleNext() }}
+                    variant="ghost"
+                    size="icon"
+                    className={cn("absolute right-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
+                    aria-label="Next image"
+                  >
+                    <ChevronRight className="size-4" strokeWidth={1.7} />
+                  </Button>
+                )}
+              </>
+            )}
+
+            {displayCount > 0 && (
+              <div className="absolute top-4 left-4 flex gap-2">
+                <Button
+                  onClick={(e) => { e.stopPropagation(); handleDelete() }}
+                  variant="ghost"
+                  size="icon"
+                  className={cn("size-11", galleryButtonClass)}
+                  aria-label="Delete image"
+                >
+                  <Trash2 className="size-4" strokeWidth={1.7} />
+                </Button>
+                <Button
+                  onClick={(e) => { e.stopPropagation(); handleDownload() }}
+                  variant="ghost"
+                  size="icon"
+                  className={cn("size-11", galleryButtonClass)}
+                  style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
+                  aria-label="Download image"
+                >
+                  <Download className="size-4" strokeWidth={1.7} />
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </motion.div>
+    </div>
+  )
+}
