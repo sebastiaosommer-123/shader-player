@@ -14,18 +14,8 @@ import { cn } from "@/lib/utils"
 import { BurningImage } from "@/components/burning-image"
 import { ScanLineOverlay } from "@/components/scan-line-overlay"
 
-/**
- * The border is deliberately fainter on a phone than the token would give you.
- * These buttons float over the capture rather than over chrome, and at full
- * strength the ring reads as a drawn outline sitting on the picture instead of
- * the edge of a piece of glass. It was already tuned that way on the arrows;
- * it belongs to all of them, so it lives here rather than being repeated at
- * four call sites. The md override restores the token for the one case where
- * this component can still end up on a wide screen — a window resized past the
- * breakpoint while the gallery is open, which does not swap the viewer.
- */
 const galleryButtonClass =
-  "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border dark:border-border/20 md:dark:border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform,opacity] duration-150 active:scale-[0.97]"
+  "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform,opacity] duration-150 active:scale-[0.97]"
 
 /** Long enough to outlast galleryMorph, in case its completion never fires. */
 const MORPH_FALLBACK_MS = Math.round(galleryMorph.duration * 1000) + 100
@@ -47,8 +37,13 @@ export function WallpaperGalleryMobile({
   initialIndex = 0,
   openedImageId,
 }: WallpaperGalleryProps) {
-  const reversedImages = [...images].reverse()
-  const imageCount = reversedImages.length
+  // Oldest to newest, left to right, so the capture you just took sits at the
+  // right-hand end and you swipe rightwards to walk back through the older
+  // ones. The reverse of this reads fine as a list — newest first — but a
+  // carousel is not a list: it is a strip of film, and on a strip of film time
+  // runs one way. Photos, Camera Roll and every scrubber you have ever used
+  // agree on which. The toolbar hands the index down already in this order.
+  const imageCount = images.length
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [imageVisible, setImageVisible] = useState(true)
@@ -188,7 +183,7 @@ export function WallpaperGalleryMobile({
     return () => clearTimeout(timer)
   }, [prefersReducedMotion])
 
-  const currentImage = reversedImages[currentIndex]
+  const currentImage = images[currentIndex]
   if (!currentImage) return null
 
   const canPrevious = currentIndex > 0
@@ -268,7 +263,27 @@ export function WallpaperGalleryMobile({
   const morphTransition = prefersReducedMotion ? reducedTransition : galleryMorph
 
   return (
-    <div className="fixed inset-0 z-50">
+    // z-50 while the gallery owns the screen; below the thumbnail the moment it
+    // starts handing back.
+    //
+    // The collapse is not drawn by anything in here — the layoutId goes home to
+    // the thumbnail in the control bar, which sits at z-10. So for as long as
+    // this box stayed at z-50 it held an opaque backdrop over the top of that
+    // collapse, and the whole first half of the close played out underneath it:
+    // the capture vanished on the click frame, the screen went black, and the
+    // photo only reappeared once the backdrop had dissolved, by which point it
+    // was most of the way home. Dropping under the thumbnail lets the backdrop
+    // keep its unhurried fade and puts it where it belongs — behind the picture
+    // being put away, not on top of it.
+    //
+    // z-0 rather than anything higher because it has to lose to the thumbnail's
+    // z-10; it still paints over the canvas, which is unpositioned.
+    <div
+      className={cn(
+        "fixed inset-0",
+        isPresent ? "z-50" : "z-0 pointer-events-none",
+      )}
+    >
       {/* Background — fades in/out independently.
           In fast, out slow, and deliberately not symmetric. The morph takes
           450ms; a backdrop that took half of that to arrive left the paused
@@ -325,7 +340,7 @@ export function WallpaperGalleryMobile({
               onScroll={handleScroll}
               aria-label="Captured frames"
             >
-              {reversedImages.map((image, index) => (
+              {images.map((image, index) => (
                 <div
                   key={image.id}
                   data-blossom-slide
@@ -343,14 +358,16 @@ export function WallpaperGalleryMobile({
                         from, and the thumbnail's is in the same proportion, so
                         the flight is a uniform scale with nothing to squash.
 
-                        items-start, so the capture hangs from the top edge and
-                        the whole letterbox collects underneath it. Free of the
-                        morph: where the card lands is just the rect Framer
-                        interpolates towards, and the invariant that keeps black
-                        bars from opening up mid-flight — the image overhanging
-                        the card until the last frame — is about their relative
-                        heights, not their position. */}
-                    <div className="absolute inset-0 flex items-start justify-center">
+                        Alignment is free of the morph, which is worth writing
+                        down because it looks like it should not be: where the
+                        card lands is just the rect Framer interpolates towards.
+                        What keeps black bars from opening up mid-flight is the
+                        image overhanging the card until the last frame — 76.5px
+                        to 652px against the card's 44px to 652px — and that is
+                        a relationship between their heights, not their
+                        positions. Centred or top-aligned, the flight is the
+                        same. */}
+                    <div className="absolute inset-0 flex items-center justify-center">
                       {/* Only the capture we opened from is a shared element — the
                           rest were never on screen to morph from.
 
@@ -450,7 +467,7 @@ export function WallpaperGalleryMobile({
                   size="icon"
                   disabled={!canPrevious}
                   style={{ opacity: canPrevious ? 1 : 0 }}
-                  className={cn("absolute left-4 top-1/2 -translate-y-1/2 size-11", galleryButtonClass)}
+                  className={cn("absolute left-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
                   aria-label="Previous image"
                 >
                   <ChevronLeft className="size-4" strokeWidth={1.7} />
@@ -462,7 +479,7 @@ export function WallpaperGalleryMobile({
                   size="icon"
                   disabled={!canNext}
                   style={{ opacity: canNext ? 1 : 0 }}
-                  className={cn("absolute right-4 top-1/2 -translate-y-1/2 size-11", galleryButtonClass)}
+                  className={cn("absolute right-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
                   aria-label="Next image"
                 >
                   <ChevronRight className="size-4" strokeWidth={1.7} />

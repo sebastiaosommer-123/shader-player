@@ -34,7 +34,10 @@ export function WallpaperGalleryDesktop({
   initialIndex = 0,
   openedImageId,
 }: WallpaperGalleryProps) {
-  const reversedImages = [...images].reverse()
+  // Oldest to newest, so the capture you just took is at the right-hand end and
+  // the left arrow walks back in time. Kept in step with the touch gallery,
+  // where the same order is what makes a rightward swipe reach the previous
+  // shot. The toolbar hands the index down already in this order.
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [imageVisible, setImageVisible] = useState(true)
@@ -52,12 +55,12 @@ export function WallpaperGalleryDesktop({
   const isPresent = useIsPresent()
 
   useEffect(() => {
-    if (currentIndex >= reversedImages.length && reversedImages.length > 0) {
-      setCurrentIndex(reversedImages.length - 1)
-    } else if (reversedImages.length === 0) {
+    if (currentIndex >= images.length && images.length > 0) {
+      setCurrentIndex(images.length - 1)
+    } else if (images.length === 0) {
       onClose()
     }
-  }, [reversedImages.length, currentIndex, onClose])
+  }, [images.length, currentIndex, onClose])
 
   useEffect(() => {
     if (!isNavigatingRef.current) {
@@ -70,13 +73,13 @@ export function WallpaperGalleryDesktop({
     }
   }, [currentIndex])
 
-  const currentImage = reversedImages[currentIndex]
+  const currentImage = images[currentIndex]
   if (!currentImage) return null
 
   const handlePrevious = () => {
     playDigitalClick("strong")
     if (prefersReducedMotion) {
-      setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reversedImages.length - 1))
+      setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1))
       return
     }
     isNavigatingRef.current = true
@@ -85,7 +88,7 @@ export function WallpaperGalleryDesktop({
     setImageVisible(false)
     setTimeout(() => {
       flushSync(() => {
-        setCurrentIndex((prev) => (prev > 0 ? prev - 1 : reversedImages.length - 1))
+        setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1))
         setSlideTransition(false)
         setSlideX(-30)
       })
@@ -101,7 +104,7 @@ export function WallpaperGalleryDesktop({
   const handleNext = () => {
     playDigitalClick("strong")
     if (prefersReducedMotion) {
-      setCurrentIndex((prev) => (prev < reversedImages.length - 1 ? prev + 1 : 0))
+      setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0))
       return
     }
     isNavigatingRef.current = true
@@ -110,7 +113,7 @@ export function WallpaperGalleryDesktop({
     setImageVisible(false)
     setTimeout(() => {
       flushSync(() => {
-        setCurrentIndex((prev) => (prev < reversedImages.length - 1 ? prev + 1 : 0))
+        setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0))
         setSlideTransition(false)
         setSlideX(30)
       })
@@ -153,7 +156,7 @@ export function WallpaperGalleryDesktop({
     if (currentImage) {
       setImageVisible(false)
       onDelete(currentImage.id)
-      const newLength = reversedImages.length - 1
+      const newLength = images.length - 1
       if (newLength === 0) {
         setTimeout(() => onClose(), 150)
       } else if (currentIndex >= newLength) {
@@ -178,13 +181,31 @@ export function WallpaperGalleryDesktop({
     }
   }
 
-  const displayCount = isDeleting ? Math.max(0, reversedImages.length - 1) : reversedImages.length
+  const displayCount = isDeleting ? Math.max(0, images.length - 1) : images.length
 
   const reducedTransition = { duration: 0.15, ease: "easeInOut" as const }
   const morphTransition = prefersReducedMotion ? reducedTransition : galleryMorph
 
   return (
-    <div className="fixed inset-0 z-50">
+    // z-50 while the gallery owns the screen; below the toolbar the moment it
+    // starts handing back.
+    //
+    // Nothing in here draws the collapse — the layoutId goes home to the
+    // thumbnail in the floating toolbar, which is fixed at z-10. Staying at
+    // z-50 through the close therefore held an opaque backdrop over the top of
+    // that collapse, and the first half of it played out underneath: the
+    // capture vanished on the click frame, the screen went black, and the photo
+    // only reappeared once the backdrop had dissolved, by which point it was
+    // most of the way home.
+    //
+    // z-0 rather than anything higher because it has to lose to the toolbar's
+    // z-10; it still paints over the canvas, which is unpositioned.
+    <div
+      className={cn(
+        "fixed inset-0",
+        isPresent ? "z-50" : "z-0 pointer-events-none",
+      )}
+    >
       {/* Background — fades in/out independently */}
       <motion.div
         className="fixed inset-0 bg-background"
@@ -288,7 +309,7 @@ export function WallpaperGalleryDesktop({
 
         {currentImage && (
           <>
-            {reversedImages.length > 1 && (
+            {images.length > 1 && (
               <>
                 {currentIndex > 0 && (
                   <Button
@@ -302,7 +323,7 @@ export function WallpaperGalleryDesktop({
                   </Button>
                 )}
 
-                {currentIndex < reversedImages.length - 1 && (
+                {currentIndex < images.length - 1 && (
                   <Button
                     onClick={(e) => { e.stopPropagation(); handleNext() }}
                     variant="ghost"

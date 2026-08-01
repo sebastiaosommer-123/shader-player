@@ -103,12 +103,14 @@ export default function Home() {
     setDeletingImageId(null)
   }
 
+  // The galleries lay their captures out in the order they were taken, so the
+  // index the toolbar hands us is already the one they want — no flip on the
+  // way in. See the ordering note in either gallery for why that direction.
   const handleThumbnailClick = (imageIndex: number) => {
     const clickedImage = capturedImages[imageIndex]
     if (!clickedImage) return
     setClickedImageId(clickedImage.id)
-    const reversedIndex = capturedImages.length - 1 - imageIndex
-    setSelectedImageIndex(reversedIndex)
+    setSelectedImageIndex(imageIndex)
     setIsGalleryOpen(true)
   }
 
