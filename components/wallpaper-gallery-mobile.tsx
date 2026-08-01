@@ -14,8 +14,18 @@ import { cn } from "@/lib/utils"
 import { BurningImage } from "@/components/burning-image"
 import { ScanLineOverlay } from "@/components/scan-line-overlay"
 
+/**
+ * The border is deliberately fainter on a phone than the token would give you.
+ * These buttons float over the capture rather than over chrome, and at full
+ * strength the ring reads as a drawn outline sitting on the picture instead of
+ * the edge of a piece of glass. It was already tuned that way on the arrows;
+ * it belongs to all of them, so it lives here rather than being repeated at
+ * four call sites. The md override restores the token for the one case where
+ * this component can still end up on a wide screen — a window resized past the
+ * breakpoint while the gallery is open, which does not swap the viewer.
+ */
 const galleryButtonClass =
-  "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform,opacity] duration-150 active:scale-[0.97]"
+  "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border dark:border-border/20 md:dark:border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform,opacity] duration-150 active:scale-[0.97]"
 
 /** Long enough to outlast galleryMorph, in case its completion never fires. */
 const MORPH_FALLBACK_MS = Math.round(galleryMorph.duration * 1000) + 100
@@ -331,8 +341,16 @@ export function WallpaperGalleryMobile({
                         to object-contain. Same pixels either way when it is
                         sitting still — but this is the box the morph scales
                         from, and the thumbnail's is in the same proportion, so
-                        the flight is a uniform scale with nothing to squash. */}
-                    <div className="absolute inset-0 flex items-center justify-center">
+                        the flight is a uniform scale with nothing to squash.
+
+                        items-start, so the capture hangs from the top edge and
+                        the whole letterbox collects underneath it. Free of the
+                        morph: where the card lands is just the rect Framer
+                        interpolates towards, and the invariant that keeps black
+                        bars from opening up mid-flight — the image overhanging
+                        the card until the last frame — is about their relative
+                        heights, not their position. */}
+                    <div className="absolute inset-0 flex items-start justify-center">
                       {/* Only the capture we opened from is a shared element — the
                           rest were never on screen to morph from.
 
@@ -432,7 +450,7 @@ export function WallpaperGalleryMobile({
                   size="icon"
                   disabled={!canPrevious}
                   style={{ opacity: canPrevious ? 1 : 0 }}
-                  className={cn("absolute left-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
+                  className={cn("absolute left-4 top-1/2 -translate-y-1/2 size-11", galleryButtonClass)}
                   aria-label="Previous image"
                 >
                   <ChevronLeft className="size-4" strokeWidth={1.7} />
@@ -444,7 +462,7 @@ export function WallpaperGalleryMobile({
                   size="icon"
                   disabled={!canNext}
                   style={{ opacity: canNext ? 1 : 0 }}
-                  className={cn("absolute right-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
+                  className={cn("absolute right-4 top-1/2 -translate-y-1/2 size-11", galleryButtonClass)}
                   aria-label="Next image"
                 >
                   <ChevronRight className="size-4" strokeWidth={1.7} />
