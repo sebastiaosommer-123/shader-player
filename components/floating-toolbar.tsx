@@ -1,13 +1,14 @@
 "use client"
 
+import { motion, useReducedMotion } from "framer-motion"
 import type { CapturedImage } from "@/lib/types"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Elevated } from "@/lib/elevated"
-import { captureFlight } from "@/lib/springs"
+import { captureFlash, spring } from "@/lib/springs"
 import { BAR_GAP, SLOT_RADIUS, SLOT_SIZE } from "@/lib/toolbar-geometry"
 import { cn } from "@/lib/utils"
 import { CaptureButton } from "./capture-button"
-import { CaptureThumbnail } from "./capture-thumbnail"
+import { CaptureSlot } from "./capture-slot"
 import { ShaderTabs } from "./shader-tabs"
 
 interface FloatingToolbarProps {
@@ -16,7 +17,6 @@ interface FloatingToolbarProps {
   onCapture: () => void
   images: CapturedImage[]
   onThumbnailClick: (imageIndex: number) => void
-  isCapturing?: boolean
   hiddenImageId?: string | null
   /** Whether to render the thumbnail slot at all — see app/page.tsx. */
   hasSlot: boolean
@@ -37,7 +37,6 @@ export function FloatingToolbar({
   onCapture,
   images,
   onThumbnailClick,
-  isCapturing = false,
   hiddenImageId,
   hasSlot,
 }: FloatingToolbarProps) {
@@ -45,10 +44,11 @@ export function FloatingToolbar({
   // would stay mounted alongside the mobile bar's — two elements claiming one
   // layoutId, which makes Framer blank whichever it decides is the stale copy.
   const isMobile = useIsMobile()
+  const prefersReducedMotion = useReducedMotion()
 
   const visibleImages = hiddenImageId ? images.filter((img) => img.id !== hiddenImageId) : images
   const latestImage = visibleImages[visibleImages.length - 1]
-  const showThumbnail = !isMobile && !!latestImage && !isCapturing
+  const showThumbnail = !isMobile && !!latestImage
 
   const handleThumbnailClick = () => {
     const originalIndex = images.findIndex((img) => img.id === latestImage.id)
@@ -56,13 +56,9 @@ export function FloatingToolbar({
   }
 
   return (
-    // The bar widens the first time a capture lands, on the same curve and over
-    // the same duration as the frame's flight — so the slot finishes opening at
-    // the moment the frame arrives in it, and the bar reads as making room.
-    //
-    // The flight target can no longer be measured off the slot, since the slot
-    // is in motion for as long as the frame is; lib/toolbar-geometry.ts derives
-    // the resting position instead.
+    // The bar widens the first time a capture lands, on the same spring the
+    // thumbnail arrives on — so the two read as one gesture: the bar making
+    // room, and the frame taking it.
     <Elevated
       data-floating-toolbar
       offset={2}
@@ -76,29 +72,44 @@ export function FloatingToolbar({
           this one, pushing both its edges outward as the slot opens. The
           negative margin swallows the flex gap while closed, which would
           otherwise leave 8px of dead space at rest. */}
-      <div
+      <motion.div
         className={cn(
           // Above the tabs and the shutter: on the way out of the gallery the
           // thumbnail is scaled to the full viewport inside this bar, and its
           // later siblings would otherwise paint straight over the top of it.
-          "relative z-10 shrink-0 transition-[width,margin-right] motion-reduce:transition-none",
-          // Clipping is only wanted while the slot is shut, to keep anything
-          // inside from spilling over the tabs. Once open it has to let content
-          // escape: the thumbnail's layoutId morph scales it to full-screen on
-          // the way into the gallery, and a 48px clip would crop that flat.
+          "relative z-10 shrink-0",
+          // Never clipped while open, and it doesn't need to be: the thumbnail
+          // is centred and scales from 0 on this same spring, so it is exactly
+          // as wide as the slot at every frame. Letting content escape is a
+          // requirement, not an oversight — the thumbnail's layoutId morph
+          // scales it to full-screen on the way into the gallery, and a 48px
+          // clip would crop that flat. Clipping only while shut, to keep a
+          // zero-width slot from leaking anything over the tabs.
           hasSlot ? "overflow-visible" : "overflow-hidden",
         )}
-        style={{
-          width: hasSlot ? SLOT_SIZE : 0,
-          marginRight: hasSlot ? 0 : -BAR_GAP,
-          height: SLOT_SIZE,
-          transitionDuration: `${captureFlight.durationMs}ms`,
-          transitionTimingFunction: captureFlight.easing,
-        }}
+        // Animating layout properties rather than a transform, knowingly —
+        // see the note above on why the width is the point. One 48px box on a
+        // 160ms spring.
+        //
+        // initial={false} so a reload with captures already in hand paints the
+        // slot open instead of animating it open.
+        initial={false}
+        animate={{ width: hasSlot ? SLOT_SIZE : 0, marginRight: hasSlot ? 0 : -BAR_GAP }}
+        // Same spring and same delay as the thumbnail it is making room for, so
+        // the two are one gesture — and so the slot's width and the thumbnail's
+        // scale are the same number at every frame. Only the opening waits on
+        // the flash; closing is a deletion, unrelated to the shutter.
+        transition={
+          prefersReducedMotion
+            ? { duration: 0 }
+            : { ...spring.moderate, delay: hasSlot ? captureFlash.holdEndMs / 1000 : 0 }
+        }
+        style={{ height: SLOT_SIZE }}
       >
         {showThumbnail && (
-          <CaptureThumbnail
+          <CaptureSlot
             image={latestImage}
+            previous={visibleImages[visibleImages.length - 2]}
             width={SLOT_SIZE}
             height={SLOT_SIZE}
             radius={SLOT_RADIUS}
@@ -108,7 +119,7 @@ export function FloatingToolbar({
             onClick={handleThumbnailClick}
           />
         )}
-      </div>
+      </motion.div>
 
       <ShaderTabs shaderId={shaderId} onShaderChange={onShaderChange} layoutIdPrefix="desktop" />
 

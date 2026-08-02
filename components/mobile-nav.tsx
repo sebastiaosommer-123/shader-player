@@ -4,7 +4,7 @@ import { useState } from "react"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import type { CapturedImage } from "@/lib/types"
 import { ControlsSheet } from "./controls-sheet"
-import { CaptureThumbnail } from "./capture-thumbnail"
+import { CaptureSlot } from "./capture-slot"
 import { ShaderTabs } from "./shader-tabs"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { useReducedMotion } from "framer-motion"
@@ -29,7 +29,6 @@ interface MobileNavProps {
   onShaderChange: (shaderId: string) => void
   images: CapturedImage[]
   onThumbnailClick: (imageIndex: number) => void
-  isCapturing?: boolean
   hiddenImageId?: string | null
 }
 
@@ -41,7 +40,6 @@ export function MobileNav({
   onShaderChange,
   images,
   onThumbnailClick,
-  isCapturing = false,
   hiddenImageId,
 }: MobileNavProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -61,7 +59,7 @@ export function MobileNav({
     ? images.filter((img) => img.id !== hiddenImageId)
     : images
   const latestImage = visibleImages[visibleImages.length - 1]
-  const showThumbnail = isMobile && !!latestImage && !isCapturing
+  const showThumbnail = isMobile && !!latestImage
 
   const handleThumbnailClick = () => {
     const originalIndex = images.findIndex((img) => img.id === latestImage.id)
@@ -102,9 +100,6 @@ export function MobileNav({
           {/* The outer slots are the same width, which is what keeps the tabs
               optically centred under the shutter. */}
           <div className="flex w-full items-center justify-between">
-            {/* The placeholder always occupies the thumbnail's exact footprint so
-                the capture animation has a target to fly to even on the very
-                first capture, when no thumbnail exists yet. */}
             {/* z-10 for the gallery exit: the thumbnail is scaled to the full
                 viewport inside this row on the way back, and the tabs and the
                 filters button would otherwise paint over it. */}
@@ -118,31 +113,16 @@ export function MobileNav({
               className="relative z-10 shrink-0 transition-[opacity,transform]"
               style={{ ...hideWhileSheetOpen(180), width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}
             >
-              {showThumbnail ? (
-                <CaptureThumbnail
+              {showThumbnail && (
+                <CaptureSlot
                   image={latestImage}
+                  previous={visibleImages[visibleImages.length - 2]}
                   width={THUMBNAIL_SIZE}
                   height={THUMBNAIL_SIZE}
                   radius={THUMBNAIL_RADIUS}
                   onClick={handleThumbnailClick}
                   elevated={false}
                 />
-              ) : (
-                // Only on mobile: the bar is merely CSS-hidden at wider widths, so
-                // an unconditional placeholder would still be in the DOM on desktop
-                // and would win the capture-target lookup with a 0x0 rect.
-                isMobile && (
-                  <div
-                    data-capture-target
-                    aria-hidden
-                    className="pointer-events-none opacity-0"
-                    style={{
-                      width: THUMBNAIL_SIZE,
-                      height: THUMBNAIL_SIZE,
-                      borderRadius: THUMBNAIL_RADIUS,
-                    }}
-                  />
-                )
               )}
             </div>
 

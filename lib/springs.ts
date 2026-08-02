@@ -23,18 +23,33 @@ export const spring = {
 } as const;
 
 /**
- * The captured frame's flight from canvas to thumbnail slot.
+ * The shutter flash over the viewfinder: rise, *hold*, release.
  *
- * Not one of the tiers above: nothing else on screen travels this far, and the
- * long deceleration is what sells the frame as a physical object being put
- * away. Shared because the toolbar's slot opens on the same curve — the slot
- * has to finish making room at the moment the frame arrives in it.
+ * The hold is the whole thing. An earlier version peaked for a single instant
+ * and decayed on an ease-out — which, applied to 1→0, dumps half the brightness
+ * in the first 10ms and then lingers dim. At 60Hz that never rendered a single
+ * full-opacity frame: it read as a flicker with a smear, not a flash. Holding
+ * full for ~3 frames and releasing on an ease-in inverts both mistakes.
+ *
+ * The colours mirror --background in app/globals.css rather than resolving it,
+ * because the flash renders inside the canvas wrapper — which is pinned `dark`
+ * at every width — but has to answer to the *page* theme instead. Keep them in
+ * step with the two --background declarations.
  */
-export const captureFlight = {
-  durationMs: 500,
-  easing: "cubic-bezier(0.32, 0.72, 0, 1)",
-  /** Reduced motion drops the travel for a plain fade. */
-  reducedMs: 150,
+export const captureFlash = {
+  durationMs: 190,
+  /** Full opacity by here. */
+  riseMs: 35,
+  /**
+   * Held at full until here, then released for the remainder.
+   *
+   * Also what the toolbar waits for: the slot and the thumbnail are held back
+   * until the black starts lifting, so the shutter reads as one event finishing
+   * before the next begins rather than everything moving at once.
+   */
+  holdEndMs: 85,
+  light: "oklch(1 0 0)",
+  dark: "oklch(0.145 0 0)",
 } as const;
 
 /**

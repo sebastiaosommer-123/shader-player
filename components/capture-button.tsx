@@ -27,10 +27,9 @@ export function CaptureButton({ onCapture }: CaptureButtonProps) {
       // hairline around it, close enough that the two read as one shutter
       // rather than as a disc parked inside a circle.
       //
-      // The press scales the fill, not the button. Transforming the button
-      // would change what getBoundingClientRect reports for it while the click
-      // handler is still running, and measureDesktopSlotRect sizes the bar off
-      // this element to aim the capture flight.
+      // The press scales the fill, not the button: on a real camera the ring is
+      // part of the body and only the button travels. Scaling both would read
+      // as the whole shutter assembly shrinking into the bar.
       className="group flex size-12 rounded-full border-[2.5px] border-shutter-ink bg-transparent p-[1.5px] shadow-none hoverFine:bg-transparent cursor-pointer"
       aria-label="Capture frame"
     >

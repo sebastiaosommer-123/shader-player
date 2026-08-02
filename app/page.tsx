@@ -9,11 +9,9 @@ import { FloatingToolbar } from "@/components/floating-toolbar"
 import { WallpaperGallery } from "@/components/wallpaper-gallery"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import type { CapturedImage } from "@/lib/types"
-import { captureCanvas } from "@/lib/canvas-capture"
-import { CaptureAnimationOverlay } from "@/components/capture-animation-overlay"
-import { calculateAnimationPositions } from "@/lib/animation-utils"
-import type { Rect } from "@/lib/animation-utils"
-import { measureDesktopSlotRect } from "@/lib/toolbar-geometry"
+import { encodeFullResolution, freezeFrame, previewDataUrl } from "@/lib/canvas-capture"
+import { CaptureFlash } from "@/components/capture-flash"
+import { captureFlash } from "@/lib/springs"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { useResizableSidebar } from "@/hooks/use-resizable-sidebar"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -32,18 +30,13 @@ export default function Home() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [clickedImageId, setClickedImageId] = useState<string | null>(null)
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
-  // The desktop toolbar's thumbnail slot is closed until the first capture, and
-  // opens as the frame flies into it. Once open it stays until the last image is
-  // deleted, at which point it closes again.
-  const [slotReserved, setSlotReserved] = useState(false)
   const shaderCanvasRef = useRef<ShaderCanvasRef>(null)
 
-  const [captureAnimation, setCaptureAnimation] = useState<{
-    imageDataUrl: string
-    sourceRect: Rect
-    targetRect: Rect
-    pendingImage: CapturedImage
-  } | null>(null)
+  // Bumped on every capture. The flash element is keyed off this, so each press
+  // remounts it and gets its own animation from the start — a counter rather
+  // than a boolean because two captures in quick succession must not collapse
+  // into one blink.
+  const [flashKey, setFlashKey] = useState(0)
 
   const handleShaderChange = (newShaderId: string) => {
     console.log("[v0] Changing shader to:", newShaderId)
@@ -56,34 +49,58 @@ export default function Home() {
     const canvas = shaderCanvasRef.current?.getCanvas()
     if (!canvas) return
 
-    const isMobile = window.innerWidth < 768
-    const captured = captureCanvas({ canvas, params, isMobile })
+    // Nothing on the click path may encode.
+    //
+    // The full-resolution PNG costs 70–94ms of main-thread work, and every
+    // arrangement of *when* to pay it is wrong: before the flash it delays the
+    // response past the point where it reads as instant; during the flash it
+    // freezes the animation mid-blink; and gating the toolbar on it is what made
+    // the slot start widening after the flash had already finished.
+    //
+    // So the click path does two cheap things — a GPU blit to freeze the frame,
+    // and a 128px JPEG of it — and the capture enters state immediately. The
+    // flash, the slot and the thumbnail all begin on the same frame off the same
+    // commit, which is the choreography this wants. Nothing at 48px can tell the
+    // difference between the preview and the real thing.
+    const frozen = freezeFrame(canvas)
+    if (!frozen) return
 
-    // Measure before opening the slot, not after. The desktop slot takes the
-    // whole flight to widen, so from here until the frame lands its live rect is
-    // mid-animation; measureDesktopSlotRect derives where it will come to rest
-    // instead. Ordering matters — this has to read the layout that setSlotReserved
-    // is about to change.
-    const slotRect = isMobile ? null : measureDesktopSlotRect()
-    const positions = calculateAnimationPositions(canvas, 0, isMobile, slotRect)
-    setSlotReserved(true)
+    const id = `${Date.now()}-${Math.random()}`
+    setCapturedImages((prev) => [
+      ...prev,
+      {
+        id,
+        dataUrl: previewDataUrl(frozen),
+        timestamp: Date.now(),
+        // The frozen frame's real dimensions, not the preview's. The thumbnail's
+        // cover box and the gallery's letterboxing are both computed from these,
+        // and the preview shares the aspect ratio, so neither has to wait.
+        width: frozen.width,
+        height: frozen.height,
+        params: { ...params },
+        shaderId: shaderId,
+      },
+    ])
+    setFlashKey((k) => k + 1)
 
-    const newImage: CapturedImage = {
-      id: `${Date.now()}-${Math.random()}`,
-      dataUrl: captured.dataUrl,
-      timestamp: captured.timestamp,
-      width: captured.width,
-      height: captured.height,
-      params: captured.params,
-      shaderId: shaderId,
-    }
-
-    setCaptureAnimation({
-      imageDataUrl: captured.dataUrl,
-      sourceRect: positions.source,
-      targetRect: positions.target,
-      pendingImage: newImage,
-    })
+    // The real capture, once everything has stopped moving. Held rather than
+    // fired immediately because toBlob still has to hand the result back to this
+    // thread, and the flash is the last thing that should be interrupted.
+    window.setTimeout(async () => {
+      const full = await encodeFullResolution(frozen)
+      if (!full) return
+      // Decode before swapping the src, or the <img> goes blank for a frame
+      // while the browser reads a 7MB PNG. A failed decode just means we keep
+      // the preview, which is still a correct picture.
+      try {
+        const probe = new Image()
+        probe.src = full
+        await probe.decode()
+      } catch {
+        return
+      }
+      setCapturedImages((prev) => prev.map((img) => (img.id === id ? { ...img, dataUrl: full } : img)))
+    }, captureFlash.durationMs + 60)
   }
 
   const handleDeleteStart = (id: string) => {
@@ -91,11 +108,20 @@ export default function Home() {
   }
 
   const handleDeleteImage = (id: string) => {
-    const remaining = capturedImages.filter((img) => img.id !== id)
-    setCapturedImages(remaining)
-    // Nothing left to show: let the toolbar shrink back to its resting width.
-    if (remaining.length === 0) setSlotReserved(false)
+    // Nothing left to show closes the desktop slot again, which falls out of
+    // hasSlot below rather than needing its own flag.
+    const doomed = capturedImages.find((img) => img.id === id)
+    setCapturedImages(capturedImages.filter((img) => img.id !== id))
     setDeletingImageId(null)
+
+    // The full-resolution capture is a blob the browser keeps alive until its
+    // URL is revoked. On a delay because this fires from the burn's completion,
+    // and the burning <img> is still holding the src for the frame in which it
+    // unmounts — revoking underneath it would break the last frame of the burn.
+    if (doomed?.dataUrl.startsWith("blob:")) {
+      const url = doomed.dataUrl
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
   }
 
   const handleGalleryClose = () => {
@@ -112,13 +138,6 @@ export default function Home() {
     setClickedImageId(clickedImage.id)
     setSelectedImageIndex(imageIndex)
     setIsGalleryOpen(true)
-  }
-
-  const handleAnimationComplete = () => {
-    if (captureAnimation) {
-      setCapturedImages((prev) => [...prev, captureAnimation.pendingImage])
-    }
-    setCaptureAnimation(null)
   }
 
   return (
@@ -163,6 +182,11 @@ export default function Home() {
             this wrapper, not on the <canvas> itself. */}
         <div className="relative h-full w-full overflow-hidden rounded-[12px] md:rounded-none">
           <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} isPaused={isGalleryOpen} />
+          {/* In here rather than over the whole page, so the blink is the
+              viewfinder's and not the app's: the chrome is the camera body and
+              stays put. Being inside the clip also gets it the artwork's exact
+              rounded corners for free. */}
+          {flashKey > 0 && <CaptureFlash key={flashKey} isMobile={isMobile} />}
         </div>
       </div>
 
@@ -185,7 +209,6 @@ export default function Home() {
         onShaderChange={handleShaderChange}
         images={capturedImages}
         onThumbnailClick={handleThumbnailClick}
-        isCapturing={!!captureAnimation}
         hiddenImageId={deletingImageId}
       />
 
@@ -198,9 +221,8 @@ export default function Home() {
         onCapture={handleCapture}
         images={capturedImages}
         onThumbnailClick={handleThumbnailClick}
-        isCapturing={!!captureAnimation}
         hiddenImageId={deletingImageId}
-        hasSlot={slotReserved || capturedImages.length > 0}
+        hasSlot={capturedImages.length > 0}
       />
 
       <AnimatePresence>
@@ -217,15 +239,6 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
-
-      {captureAnimation && (
-        <CaptureAnimationOverlay
-          imageDataUrl={captureAnimation.imageDataUrl}
-          sourceRect={captureAnimation.sourceRect}
-          targetRect={captureAnimation.targetRect}
-          onComplete={handleAnimationComplete}
-        />
-      )}
     </div>
   )
 }
