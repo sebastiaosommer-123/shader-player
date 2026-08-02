@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { flushSync } from "react-dom"
 import { motion, useIsPresent, useReducedMotion } from "framer-motion"
 import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
@@ -47,6 +47,43 @@ export function WallpaperGalleryDesktop({
   const [slideX, setSlideX] = useState(0)
   const [slideTransition, setSlideTransition] = useState(true)
   const isNavigatingRef = useRef(false)
+
+  /**
+   * The rect the capture actually occupies on screen — the letterboxed box, not
+   * the viewer's.
+   *
+   * This is what the morph has to land on. A card that grows to fill the viewer
+   * is a different shape from the photo inside it, so the letterbox opens up
+   * *during* the flight and you watch black bars grow at the edges of a card
+   * that is still travelling. Growing to the photo's own rect instead means the
+   * capture fills the card from the first frame to the last, and the black
+   * around it is just backdrop the card has not reached yet.
+   *
+   * documentElement rather than window.innerWidth: this is the box a
+   * `position: fixed` element resolves against. The 32px is md:inset-8 on the
+   * viewer below, which is the only inset this component ever has.
+   */
+  const openedImage = images.find((image) => image.id === openedImageId)
+  const measureFitBox = useCallback(() => {
+    const inset = window.matchMedia("(min-width: 768px)").matches ? 32 : 0
+    const boxWidth = Math.max(document.documentElement.clientWidth - inset * 2, 0)
+    const boxHeight = Math.max(document.documentElement.clientHeight - inset * 2, 0)
+    // A capture taken before the canvas was sized comes back 0×0; nothing sane
+    // to fit, so let it have the whole box.
+    if (!openedImage?.width || !openedImage?.height) {
+      return { width: boxWidth, height: boxHeight }
+    }
+    const scale = Math.min(boxWidth / openedImage.width, boxHeight / openedImage.height)
+    return { width: openedImage.width * scale, height: openedImage.height * scale }
+  }, [openedImage])
+
+  const [fitBox, setFitBox] = useState(measureFitBox)
+
+  useEffect(() => {
+    const handleResize = () => setFitBox(measureFitBox())
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [measureFitBox])
 
   const prefersReducedMotion = useReducedMotion()
   // Flips false the instant AnimatePresence starts removing us — long before it
@@ -215,22 +252,20 @@ export function WallpaperGalleryDesktop({
         transition={prefersReducedMotion ? reducedTransition : { duration: 0.25, ease: "easeOut" }}
       />
 
-      {/* Image container — shared element transition from thumbnail.
-          Dropped the moment the close begins rather than when AnimatePresence
-          finally unmounts us. Framer can only hand the layoutId back to the
-          thumbnail once this node is gone, and AnimatePresence holds the whole
-          subtree alive until the slowest exit below finishes — which used to
-          mean a quarter-second of the image sitting fullscreen while the
+      {/* The viewer itself. Dropped the moment the close begins rather than when
+          AnimatePresence finally unmounts us. Framer can only hand the layoutId
+          back to the thumbnail once the card below is gone, and AnimatePresence
+          holds the whole subtree alive until the slowest exit finishes — which
+          used to mean a quarter-second of the image sitting there while the
           backdrop dissolved off it, and only then a collapse. Now the collapse
-          starts on the click frame and those fades run alongside it. */}
+          starts on the click frame and those fades run alongside it.
+
+          Plain, not a motion element: the shared element is the card around the
+          capture, further down. Hanging the layoutId on this box meant morphing
+          to the viewer, and the viewer is not the shape of the photo. */}
       {isPresent && (
-        <motion.div
-          layoutId={`gallery-container-${openedImageId}`}
-          // bg-background so the letterbox either side of the capture is opaque
-          // rather than a window onto the app still fading out behind it.
-          className="fixed inset-0 overflow-hidden bg-background md:inset-8"
-          style={{ borderRadius: 0 }}
-          transition={morphTransition}
+        <div
+          className="fixed inset-0 overflow-hidden md:inset-8"
           onClick={handleClose}
         >
           {currentImage && (
@@ -252,19 +287,31 @@ export function WallpaperGalleryDesktop({
                     }
               }
             >
-              {/* Sized to the letterboxed rect rather than stretched across the
-                  container and left to object-contain: this is the box the morph
-                  scales from, and the thumbnail's is in the same proportion, so
-                  the flight stays a uniform scale. */}
+              {/* Two nested layoutIds, and the pair is the whole trick. The card
+                  is the aperture: it travels from the thumbnail's rounded square
+                  to the photo's rect, carrying the corner radius down to zero.
+                  The image travels from the thumbnail's cover box, which
+                  overhangs that square, to the same photo rect — so it overhangs
+                  the card everywhere except at the very end, and the card clips
+                  it. The capture fills the aperture the entire way across; what
+                  changes is how much of it you are allowed to see. */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <motion.img
-                  layoutId={`gallery-image-${openedImageId}`}
+                <motion.div
+                  layoutId={`gallery-container-${openedImageId}`}
+                  className="relative overflow-hidden"
+                  style={{ borderRadius: 0, width: fitBox.width, height: fitBox.height }}
                   transition={morphTransition}
-                  src={currentImage.dataUrl || "/placeholder.svg"}
-                  alt={`Captured frame ${currentIndex + 1}`}
-                  className="max-h-full max-w-full"
-                  onClick={(e) => e.stopPropagation()}
-                />
+                >
+                  <motion.img
+                    layoutId={`gallery-image-${openedImageId}`}
+                    transition={morphTransition}
+                    src={currentImage.dataUrl || "/placeholder.svg"}
+                    alt={`Captured frame ${currentIndex + 1}`}
+                    className="block"
+                    style={{ width: fitBox.width, height: fitBox.height }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </motion.div>
               </div>
             </div>
           )}
@@ -280,7 +327,7 @@ export function WallpaperGalleryDesktop({
               <ScanLineOverlay src={currentImage.dataUrl} onComplete={handleScanComplete} />
             </div>
           )}
-        </motion.div>
+        </div>
       )}
 
       {/* UI controls — fade in after image settles */}
