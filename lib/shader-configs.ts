@@ -28,13 +28,22 @@ export interface ShaderParameterGroup {
 
 export interface ShaderConfig {
   id: string
+  /**
+   * One word, and it names the mark you can see rather than the technique that
+   * draws it — Haze, not Gradient Wave. This is the tab's visible label, in a
+   * track that has to sit between the thumbnail slot and the shutter on desktop
+   * and between the thumbnail and the filters button on a phone, so a second
+   * word costs real estate in the one place there is none. It is also the only
+   * thing the tabs read off a shader, which is what keeps this the single
+   * source of truth for what a shader is called.
+   */
   name: string
   fragmentShader: string
   defaultParams: Record<string, number | string>
   parameterGroups: ShaderParameterGroup[]
 }
 
-// Fragment shader for Gradient Wave
+// Fragment shader for Haze
 const terracottaFragmentShader = `
   precision highp float;
   
@@ -114,7 +123,7 @@ const terracottaFragmentShader = `
   }
 `
 
-// Fragment shader for Flex Tile
+// Fragment shader for Bars
 const plasmaWaveFragmentShader = `
   precision highp float;
   
@@ -171,7 +180,7 @@ const plasmaWaveFragmentShader = `
   }
 `
 
-// Fragment shader for Pixel Topography
+// Fragment shader for Rings
 const pixelTopographyFragmentShader = `
   precision mediump float;
 
@@ -421,7 +430,7 @@ const pixelTopographyFragmentShader = `
 export const SHADER_CONFIGS: Record<string, ShaderConfig> = {
   terracotta: {
     id: "terracotta",
-    name: "Gradient Wave",
+    name: "Haze",
     fragmentShader: terracottaFragmentShader,
     defaultParams: {
       horizontalWaveAmplitude: 0.05,
@@ -502,7 +511,7 @@ export const SHADER_CONFIGS: Record<string, ShaderConfig> = {
   },
   plasma: {
     id: "plasma",
-    name: "Flex Tile",
+    name: "Bars",
     fragmentShader: plasmaWaveFragmentShader,
     defaultParams: {
       baseRows: 5.0,
@@ -545,7 +554,7 @@ export const SHADER_CONFIGS: Record<string, ShaderConfig> = {
   },
   pixelTopography: {
     id: "pixelTopography",
-    name: "Pixel Topography",
+    name: "Rings",
     fragmentShader: pixelTopographyFragmentShader,
     defaultParams: {
       gridX: 25.0,
