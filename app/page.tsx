@@ -7,6 +7,7 @@ import { ControlsSidebar } from "@/components/controls-sidebar"
 import { MobileNav } from "@/components/mobile-nav"
 import { FloatingToolbar } from "@/components/floating-toolbar"
 import { WallpaperGallery } from "@/components/wallpaper-gallery"
+import { GalleryCloseFlight, type CloseFlight } from "@/components/gallery-close-flight"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import type { CapturedImage } from "@/lib/types"
 import { encodeFullResolution, freezeFrame, previewDataUrl } from "@/lib/canvas-capture"
@@ -30,6 +31,11 @@ export default function Home() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [clickedImageId, setClickedImageId] = useState<string | null>(null)
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
+  // Set when the gallery is dismissed from a capture other than the one it was
+  // opened on, which is the one the thumbnail is showing. The shared-element
+  // morph cannot draw that — see GalleryCloseFlight — so it is stood down for as
+  // long as this is here, and the flight collapses the capture instead.
+  const [closeFlight, setCloseFlight] = useState<CloseFlight | null>(null)
   const shaderCanvasRef = useRef<ShaderCanvasRef>(null)
 
   // Bumped on every capture. The flash element is keyed off this, so each press
@@ -124,9 +130,13 @@ export default function Home() {
     }
   }
 
-  const handleGalleryClose = () => {
+  const handleGalleryClose = (flight?: CloseFlight) => {
     setIsGalleryOpen(false)
     setDeletingImageId(null)
+    // One commit: the gallery's shared element goes out with its subtree and the
+    // thumbnail leaves the layoutId stack at the same time, so the stack empties
+    // rather than leaving a member behind to fly home on its own.
+    if (flight) setCloseFlight(flight)
   }
 
   // The galleries lay their captures out in the order they were taken, so the
@@ -135,6 +145,9 @@ export default function Home() {
   const handleThumbnailClick = (imageIndex: number) => {
     const clickedImage = capturedImages[imageIndex]
     if (!clickedImage) return
+    // Opening again before the last close has landed: drop the flight so the
+    // thumbnail is back in the layoutId stack for the morph it is about to lead.
+    setCloseFlight(null)
     setClickedImageId(clickedImage.id)
     setSelectedImageIndex(imageIndex)
     setIsGalleryOpen(true)
@@ -210,6 +223,7 @@ export default function Home() {
         images={capturedImages}
         onThumbnailClick={handleThumbnailClick}
         hiddenImageId={deletingImageId}
+        suppressMorph={!!closeFlight}
       />
 
       {/* Desktop's floating control bar. A sibling of the canvas, never a child:
@@ -223,6 +237,7 @@ export default function Home() {
         onThumbnailClick={handleThumbnailClick}
         hiddenImageId={deletingImageId}
         hasSlot={capturedImages.length > 0}
+        suppressMorph={!!closeFlight}
       />
 
       <AnimatePresence>
@@ -239,6 +254,17 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
+
+      {/* Outside the AnimatePresence above on purpose: the gallery is unmounted
+          as soon as its backdrop has finished fading, a good 200ms before this
+          lands, and its root drops below the control bars on the close frame. */}
+      {closeFlight && (
+        <GalleryCloseFlight
+          key={closeFlight.image.id}
+          flight={closeFlight}
+          onComplete={() => setCloseFlight(null)}
+        />
+      )}
     </div>
   )
 }

@@ -30,6 +30,8 @@ interface CaptureSlotProps {
   onClick: () => void
   elevated?: boolean
   radius?: number
+  /** Passed straight through; see CaptureThumbnail. */
+  suppressMorph?: boolean
 }
 
 /**
@@ -57,6 +59,7 @@ export function CaptureSlot({
   onClick,
   elevated = true,
   radius = THUMBNAIL_RADIUS,
+  suppressMorph = false,
 }: CaptureSlotProps) {
   // Which capture has finished arriving. Latched by a timer, and deliberately
   // fails *safe*: a remount resets it to null, which shows the outgoing layer
@@ -103,12 +106,26 @@ export function CaptureSlot({
 
       <CaptureThumbnail
         // Remounting on the id is what replays the arrival for every capture.
-        key={image.id}
+        //
+        // And remounting on suppressMorph is the only way to take the thumbnail
+        // out of the gallery's shared-element pair: Framer reads layoutId once,
+        // when it builds the projection node, so handing the same element
+        // `undefined` later leaves it in the stack — and a stack member left
+        // behind when the gallery unmounts resumes from the gallery's box, which
+        // is the wrong-photograph flight this exists to prevent. A brand-new
+        // element built without a layoutId has nothing to resume from.
+        //
+        // The arrival is not replayed for that second kind of remount: the
+        // capture has been sitting in the bar for a while by then, and popping it
+        // out of existence and back would be an animation about nothing.
+        key={`${image.id}${suppressMorph ? "-still" : ""}`}
+        animateArrival={settledId !== image.id}
         image={image}
         width={width}
         height={height}
         radius={radius}
         elevated={elevated}
+        suppressMorph={suppressMorph}
         onClick={onClick}
       />
     </>

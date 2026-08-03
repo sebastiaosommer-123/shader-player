@@ -56,6 +56,37 @@ interface CaptureThumbnailProps {
    * way across.
    */
   radius?: number
+  /**
+   * Drops out of the shared-element pair for as long as it is set.
+   *
+   * The page raises this when the gallery is dismissed from a capture other than
+   * the one it was opened on. The morph home would then be drawing the wrong
+   * photograph — this thumbnail's, rather than the one on screen — so
+   * GalleryCloseFlight draws the collapse instead, and this has to be out of the
+   * layoutId stack while it does.
+   *
+   * Suppressing it *here* rather than in the gallery is the load-bearing part:
+   * when a member of the stack unmounts, the member left behind resumes from its
+   * box, which is precisely the mechanism that draws the real close. Leaving
+   * this one registered would have it fly home on its own underneath the flight.
+   * Taken out here, the gallery's node unmounts into an empty stack and nothing
+   * animates.
+   *
+   * Only ever read on mount, which is why CaptureSlot keys this component on it:
+   * Framer takes layoutId once, when it builds the projection node, and never
+   * looks at the prop again. Handing it undefined on a live element changes
+   * nothing at all — the node stays in the stack and flies home regardless.
+   */
+  suppressMorph?: boolean
+  /**
+   * Whether to scale up from nothing on mount.
+   *
+   * True for a capture that has just been taken, which is what the arrival is
+   * for; false when this is only being remounted to leave the layoutId stack,
+   * where replaying it would pop the thumbnail out of existence and back for no
+   * reason the user could name.
+   */
+  animateArrival?: boolean
 }
 
 /**
@@ -70,6 +101,8 @@ export function CaptureThumbnail({
   onClick,
   elevated = true,
   radius = THUMBNAIL_RADIUS,
+  suppressMorph = false,
+  animateArrival = true,
 }: CaptureThumbnailProps) {
   const prefersReducedMotion = useReducedMotion()
   const pressRef = useRef<HTMLDivElement>(null)
@@ -110,6 +143,7 @@ export function CaptureThumbnail({
   }
 
   const transition = prefersReducedMotion ? { duration: 0 } : galleryMorph
+  const morphs = !prefersReducedMotion && !suppressMorph
 
   const cover = coverBox(image, width, height)
 
@@ -136,7 +170,7 @@ export function CaptureThumbnail({
     // Scale alone, no opacity — growing from nothing is already the reveal, and
     // a fade on top of it only makes the edge mushy.
     <motion.div
-      initial={prefersReducedMotion ? false : { scale: 0 }}
+      initial={prefersReducedMotion || !animateArrival ? false : { scale: 0 }}
       animate={{ scale: 1 }}
       // Held until the flash starts lifting; see captureFlash.holdEndMs.
       transition={
@@ -167,7 +201,12 @@ export function CaptureThumbnail({
         style={{ width, height }}
       >
         <motion.div
-          layoutId={prefersReducedMotion ? undefined : `gallery-container-${image.id}`}
+          layoutId={morphs ? `gallery-container-${image.id}` : undefined}
+          // What GalleryCloseFlight measures its landing box off. On the
+          // thumbnail's own element rather than the slot around it, because this
+          // is the box the morph lands on: the radius and the clip are both
+          // here.
+          data-capture-thumbnail
           onClick={handleClick}
           className="cursor-pointer relative group overflow-hidden"
           style={{
@@ -189,7 +228,7 @@ export function CaptureThumbnail({
                 stretched by however unevenly the box grows — and a circle reaching a
                 landscape viewport grows very unevenly indeed. */}
             <motion.img
-              layoutId={prefersReducedMotion ? undefined : `gallery-image-${image.id}`}
+              layoutId={morphs ? `gallery-image-${image.id}` : undefined}
               transition={transition}
               src={image.dataUrl || "/placeholder.svg"}
               alt="Latest capture"

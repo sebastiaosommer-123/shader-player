@@ -30,6 +30,8 @@ interface MobileNavProps {
   images: CapturedImage[]
   onThumbnailClick: (imageIndex: number) => void
   hiddenImageId?: string | null
+  /** Passed straight through to the thumbnail; see CaptureThumbnail. */
+  suppressMorph?: boolean
 }
 
 export function MobileNav({
@@ -41,6 +43,7 @@ export function MobileNav({
   images,
   onThumbnailClick,
   hiddenImageId,
+  suppressMorph,
 }: MobileNavProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const prefersReducedMotion = useReducedMotion()
@@ -122,6 +125,7 @@ export function MobileNav({
                   radius={THUMBNAIL_RADIUS}
                   onClick={handleThumbnailClick}
                   elevated={false}
+                  suppressMorph={suppressMorph}
                 />
               )}
             </div>

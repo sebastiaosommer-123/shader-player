@@ -6,10 +6,12 @@ import { motion, useIsPresent, useReducedMotion } from "framer-motion"
 import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { CapturedImage } from "@/lib/types"
+import type { CloseFlight } from "@/components/gallery-close-flight"
 import { downloadImage } from "@/lib/canvas-capture"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { playDownloadConfirmation } from "@/lib/download-audio"
 import { galleryMorph } from "@/lib/springs"
+import { closeFlightFrom } from "@/components/gallery-close-flight"
 import { cn } from "@/lib/utils"
 import { BurningImage } from "@/components/burning-image"
 import { ScanLineOverlay } from "@/components/scan-line-overlay"
@@ -19,7 +21,7 @@ const galleryButtonClass =
 
 interface WallpaperGalleryProps {
   images: CapturedImage[]
-  onClose: () => void
+  onClose: (flight?: CloseFlight) => void
   onDelete: (id: string) => void
   onDeleteStart?: (id: string) => void
   initialIndex?: number
@@ -47,6 +49,9 @@ export function WallpaperGalleryDesktop({
   const [slideX, setSlideX] = useState(0)
   const [slideTransition, setSlideTransition] = useState(true)
   const isNavigatingRef = useRef(false)
+  // The capture as it is actually painted, for a close that has to draw its own
+  // collapse. See handleClose.
+  const captureRef = useRef<HTMLImageElement>(null)
 
   /**
    * The rect the capture actually occupies on screen — the letterboxed box, not
@@ -59,27 +64,38 @@ export function WallpaperGalleryDesktop({
    * capture fills the card from the first frame to the last, and the black
    * around it is just backdrop the card has not reached yet.
    *
+   * Measured from the capture on screen and not from the one the gallery was
+   * opened on, which are the same picture until you press an arrow. Two captures
+   * only differ in shape if the canvas was resized between them — drag the
+   * sidebar and the next shot is a different aspect ratio — and sizing every
+   * capture to the *opened* one then squeezed a landscape frame into a portrait
+   * box: the picture distorted, and the close inherited the wrong shape to fly
+   * home from, since the flight starts from whatever is painted.
+   *
    * documentElement rather than window.innerWidth: this is the box a
    * `position: fixed` element resolves against. The 32px is md:inset-8 on the
    * viewer below, which is the only inset this component ever has.
    */
-  const openedImage = images.find((image) => image.id === openedImageId)
+  const shownImage = images[currentIndex]
   const measureFitBox = useCallback(() => {
     const inset = window.matchMedia("(min-width: 768px)").matches ? 32 : 0
     const boxWidth = Math.max(document.documentElement.clientWidth - inset * 2, 0)
     const boxHeight = Math.max(document.documentElement.clientHeight - inset * 2, 0)
     // A capture taken before the canvas was sized comes back 0×0; nothing sane
     // to fit, so let it have the whole box.
-    if (!openedImage?.width || !openedImage?.height) {
+    if (!shownImage?.width || !shownImage?.height) {
       return { width: boxWidth, height: boxHeight }
     }
-    const scale = Math.min(boxWidth / openedImage.width, boxHeight / openedImage.height)
-    return { width: openedImage.width * scale, height: openedImage.height * scale }
-  }, [openedImage])
+    const scale = Math.min(boxWidth / shownImage.width, boxHeight / shownImage.height)
+    return { width: shownImage.width * scale, height: shownImage.height * scale }
+  }, [shownImage])
 
   const [fitBox, setFitBox] = useState(measureFitBox)
 
+  // Re-measured on a resize and on every step through the strip, since the
+  // capture being stepped to may not be the shape of the one leaving.
   useEffect(() => {
+    setFitBox(measureFitBox())
     const handleResize = () => setFitBox(measureFitBox())
     window.addEventListener("resize", handleResize)
     return () => window.removeEventListener("resize", handleResize)
@@ -207,7 +223,12 @@ export function WallpaperGalleryDesktop({
 
   const handleClose = () => {
     playDigitalClick("strong")
-    onClose()
+    // The shared element is bound to the capture the gallery was opened on,
+    // which is the one the thumbnail is showing. Step away with the arrows and
+    // the morph home would be collapsing the wrong photograph — so the page
+    // draws this one's collapse instead.
+    const strayed = currentImage.id !== openedImageId && !prefersReducedMotion
+    onClose(strayed ? closeFlightFrom(captureRef.current, currentImage) : undefined)
   }
 
   const handleScanComplete = () => {
@@ -296,14 +317,26 @@ export function WallpaperGalleryDesktop({
                   it. The capture fills the aperture the entire way across; what
                   changes is how much of it you are allowed to see. */}
               <div className="absolute inset-0 flex items-center justify-center">
+                {/* layoutDependency pins the layout animation to the open and the
+                    close and nothing else. Framer animates a projection node
+                    whenever its box changes, and the box now changes on every
+                    arrow press that steps to a differently-shaped capture — which
+                    would set the frame growing across the screen behind a picture
+                    that is mid-crossfade. Held constant for the gallery's life, an
+                    ordinary re-render is measured but not animated, while the
+                    morph — driven by the shared element mounting and unmounting —
+                    is untouched. */}
                 <motion.div
                   layoutId={`gallery-container-${openedImageId}`}
+                  layoutDependency={openedImageId}
                   className="relative overflow-hidden"
                   style={{ borderRadius: 0, width: fitBox.width, height: fitBox.height }}
                   transition={morphTransition}
                 >
                   <motion.img
+                    ref={captureRef}
                     layoutId={`gallery-image-${openedImageId}`}
+                    layoutDependency={openedImageId}
                     transition={morphTransition}
                     src={currentImage.dataUrl || "/placeholder.svg"}
                     alt={`Captured frame ${currentIndex + 1}`}

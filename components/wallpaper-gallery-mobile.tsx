@@ -6,6 +6,8 @@ import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
 import { BlossomCarousel, type BlossomCarouselHandle } from "@blossom-carousel/react"
 import { Button } from "@/components/ui/button"
 import type { CapturedImage } from "@/lib/types"
+import type { CloseFlight } from "@/components/gallery-close-flight"
+import { closeFlightFrom } from "@/components/gallery-close-flight"
 import { downloadImage } from "@/lib/canvas-capture"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { playDownloadConfirmation } from "@/lib/download-audio"
@@ -22,7 +24,7 @@ const MORPH_FALLBACK_MS = Math.round(galleryMorph.duration * 1000) + 100
 
 interface WallpaperGalleryProps {
   images: CapturedImage[]
-  onClose: () => void
+  onClose: (flight?: CloseFlight) => void
   onDelete: (id: string) => void
   onDeleteStart?: (id: string) => void
   initialIndex?: number
@@ -61,6 +63,15 @@ export function WallpaperGalleryMobile({
   // changes — that effect exists to follow a deletion, not to fight a scroll.
   const currentIndexRef = useRef(currentIndex)
   currentIndexRef.current = currentIndex
+
+  // The capture on screen, as painted, for a close that has to draw its own
+  // collapse — see handleClose. Nulls are ignored rather than stored: React
+  // detaches the outgoing slide's ref and attaches the incoming one in the same
+  // commit, and only the arrival is news.
+  const captureRef = useRef<HTMLImageElement | null>(null)
+  const setCaptureNode = useCallback((node: HTMLImageElement | null) => {
+    if (node) captureRef.current = node
+  }, [])
 
   /**
    * The rect the opened capture actually occupies on screen — the letterboxed
@@ -243,10 +254,16 @@ export function WallpaperGalleryMobile({
 
   const handleClose = () => {
     playDigitalClick("strong")
+    // The shared element is bound to the capture the gallery was opened on, and
+    // that slide is off screen the moment you swipe away from it — the morph
+    // home would fly from a rect nobody can see. So the page draws the collapse
+    // of the capture actually in front of you instead.
+    const strayed = currentImage.id !== openedImageId && !prefersReducedMotion
+    const flight = strayed ? closeFlightFrom(captureRef.current, currentImage) : undefined
     // Hand the transform back to Framer before the collapse starts, so a gallery
     // closed mid-swipe still morphs from where the capture actually sits.
     setIsMorphing(true)
-    onClose()
+    onClose(flight)
   }
 
   const handleScanComplete = () => {
@@ -389,6 +406,7 @@ export function WallpaperGalleryMobile({
                           onLayoutAnimationComplete={() => setIsMorphing(false)}
                         >
                           <motion.img
+                            ref={index === currentIndex ? setCaptureNode : undefined}
                             layoutId={`gallery-image-${openedImageId}`}
                             transition={morphTransition}
                             src={image.dataUrl || "/placeholder.svg"}
@@ -401,6 +419,7 @@ export function WallpaperGalleryMobile({
                         </motion.div>
                       ) : (
                         <img
+                          ref={index === currentIndex ? setCaptureNode : undefined}
                           src={image.dataUrl || "/placeholder.svg"}
                           alt={`Captured frame ${index + 1} of ${imageCount}`}
                           className="max-h-full max-w-full"

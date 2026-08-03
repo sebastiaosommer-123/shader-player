@@ -20,6 +20,8 @@ interface FloatingToolbarProps {
   hiddenImageId?: string | null
   /** Whether to render the thumbnail slot at all — see app/page.tsx. */
   hasSlot: boolean
+  /** Passed straight through to the thumbnail; see CaptureThumbnail. */
+  suppressMorph?: boolean
 }
 
 /**
@@ -39,6 +41,7 @@ export function FloatingToolbar({
   onThumbnailClick,
   hiddenImageId,
   hasSlot,
+  suppressMorph,
 }: FloatingToolbarProps) {
   // This bar is only CSS-hidden on mobile, so without a JS gate its thumbnail
   // would stay mounted alongside the mobile bar's — two elements claiming one
@@ -116,6 +119,7 @@ export function FloatingToolbar({
             // The bar is already an opaque surface; a drop shadow here would
             // read as a sticker sitting on it.
             elevated={false}
+            suppressMorph={suppressMorph}
             onClick={handleThumbnailClick}
           />
         )}

@@ -2,12 +2,19 @@
 
 import { useState } from "react"
 import type { CapturedImage } from "@/lib/types"
+import type { CloseFlight } from "@/components/gallery-close-flight"
 import { WallpaperGalleryDesktop } from "@/components/wallpaper-gallery-desktop"
 import { WallpaperGalleryMobile } from "@/components/wallpaper-gallery-mobile"
 
 interface WallpaperGalleryProps {
   images: CapturedImage[]
-  onClose: () => void
+  /**
+   * The flight is only handed over when the capture on screen is not the one the
+   * shared element is bound to — see GalleryCloseFlight. Every other way out
+   * (the last capture burning away, the list emptying) closes bare and keeps the
+   * morph.
+   */
+  onClose: (flight?: CloseFlight) => void
   onDelete: (id: string) => void
   onDeleteStart?: (id: string) => void
   initialIndex?: number
