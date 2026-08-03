@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef } from "react"
 import { motion, useReducedMotion } from "framer-motion"
 import type { CapturedImage } from "@/lib/types"
 import { playDigitalClick } from "@/lib/audio-feedback"
@@ -71,10 +72,41 @@ export function CaptureThumbnail({
   radius = THUMBNAIL_RADIUS,
 }: CaptureThumbnailProps) {
   const prefersReducedMotion = useReducedMotion()
+  const pressRef = useRef<HTMLDivElement>(null)
 
   const handleClick = () => {
+    // The press affordance below is a CSS transform on an *ancestor* of the
+    // shared element, and this click is the one moment those two things meet:
+    // Framer measures the thumbnail on this very frame, while the 150ms release
+    // is still easing 0.97 back to 1. The projection transform it derives is
+    // relative to whatever the element renders at, so a box measured 3% small
+    // makes the thumbnail's half of the crossfade fly 3% *large* for the whole
+    // morph — its edges showing as a rim around the gallery's copy, through a
+    // backdrop that has not finished fading in.
+    //
+    // So the press is put back at rest for the single frame the morph is
+    // measured on, and handed straight back to the stylesheet. Nothing about how
+    // the press looks changes: the pointer is already up by the time this runs,
+    // this reset and the gallery's mount land in the same commit so there is no
+    // frame in which the snap is painted on its own, and every press that does
+    // not open the gallery keeps the full eased release.
+    const press = pressRef.current
+    if (press) {
+      press.style.transition = "none"
+      press.style.transform = "none"
+      // Read it back, or the two writes above are still queued when Framer
+      // measures.
+      press.getBoundingClientRect()
+    }
+
     playDigitalClick("strong")
     onClick()
+
+    requestAnimationFrame(() => {
+      if (!press) return
+      press.style.transition = ""
+      press.style.transform = ""
+    })
   }
 
   const transition = prefersReducedMotion ? { duration: 0 } : galleryMorph
@@ -130,6 +162,7 @@ export function CaptureThumbnail({
           together — scaling from inside would pull the image off the clipped
           edge instead. */}
       <div
+        ref={pressRef}
         className="active:scale-[0.97] transition-transform duration-150 ease-out motion-reduce:transition-none"
         style={{ width, height }}
       >
