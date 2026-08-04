@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, type CSSProperties } from "react"
+import { useState, useRef, useEffect, type CSSProperties } from "react"
 import { AnimatePresence } from "framer-motion"
 import { ShaderCanvas, type ShaderCanvasRef } from "@/components/shader-canvas"
 import { ControlsSidebar } from "@/components/controls-sidebar"
@@ -11,6 +11,7 @@ import { GalleryCloseFlight, type CloseFlight } from "@/components/gallery-close
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import type { CapturedImage } from "@/lib/types"
 import { encodeFullResolution, freezeFrame, previewDataUrl } from "@/lib/canvas-capture"
+import { warmPngEncoder } from "@/lib/png-encoder"
 import { CaptureFlash } from "@/components/capture-flash"
 import { captureFlash } from "@/lib/springs"
 import { getShaderConfig } from "@/lib/shader-configs"
@@ -43,6 +44,18 @@ export default function Home() {
   // than a boolean because two captures in quick succession must not collapse
   // into one blink.
   const [flashKey, setFlashKey] = useState(0)
+
+  // The encoder's thread costs about a tenth of a second to start, and it is
+  // started by whatever asks it for the first PNG — which, left alone, is the
+  // first capture of the session. Paid here instead, while the page is settling.
+  useEffect(() => {
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(() => warmPngEncoder(), { timeout: 2000 })
+      return () => window.cancelIdleCallback(handle)
+    }
+    const timer = window.setTimeout(warmPngEncoder, 1200)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const handleShaderChange = (newShaderId: string) => {
     console.log("[v0] Changing shader to:", newShaderId)

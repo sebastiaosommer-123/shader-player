@@ -1,4 +1,5 @@
 import type { ShaderParams } from "./shader-uniforms"
+import { encodePng } from "./png-encoder"
 
 /**
  * Long edge of the instant preview.
@@ -43,18 +44,20 @@ export function previewDataUrl(frozen: HTMLCanvasElement): string {
 /**
  * The real capture, as an object URL.
  *
- * toBlob rather than toDataURL on purpose. toDataURL is synchronous and pins the
+ * A blob rather than toDataURL on purpose. toDataURL is synchronous and pins the
  * main thread for the whole encode, so a rapid second capture's flash would
  * stall on the first one's PNG whenever the two overlapped. It also hands back
  * base64 — a third larger than the bytes, held in React state as a string, for
  * every capture in the session. A blob keeps the binary once.
  *
+ * The encode itself happens in a worker; see lib/png-encoder.ts for why, and for
+ * what happens on a browser that cannot.
+ *
  * The URL has to be revoked when its image is deleted; see handleDeleteImage.
  */
-export function encodeFullResolution(frozen: HTMLCanvasElement): Promise<string | null> {
-  return new Promise((resolve) => {
-    frozen.toBlob((blob) => resolve(blob ? URL.createObjectURL(blob) : null), "image/png")
-  })
+export async function encodeFullResolution(frozen: HTMLCanvasElement): Promise<string | null> {
+  const blob = await encodePng(frozen)
+  return blob ? URL.createObjectURL(blob) : null
 }
 
 export function downloadImage(dataUrl: string, params: ShaderParams, timestamp: number, shaderId?: string) {
