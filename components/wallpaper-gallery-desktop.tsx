@@ -10,11 +10,12 @@ import type { CloseFlight } from "@/components/gallery-close-flight"
 import { downloadImage } from "@/lib/canvas-capture"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { playDownloadConfirmation } from "@/lib/download-audio"
+import { toast } from "sonner"
 import { galleryMorph } from "@/lib/springs"
 import { closeFlightFrom } from "@/components/gallery-close-flight"
 import { cn } from "@/lib/utils"
-import { BurningImage } from "@/components/burning-image"
-import { ScanLineOverlay } from "@/components/scan-line-overlay"
+import { dismissCapture } from "@/components/capture-dismissal"
+import { useCaptureSlideIn } from "@/hooks/use-capture-slide-in"
 
 const galleryButtonClass =
   "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform] duration-150 active:scale-[0.97]"
@@ -23,7 +24,6 @@ interface WallpaperGalleryProps {
   images: CapturedImage[]
   onClose: (flight?: CloseFlight) => void
   onDelete: (id: string) => void
-  onDeleteStart?: (id: string) => void
   initialIndex?: number
   openedImageId: string
 }
@@ -32,7 +32,6 @@ export function WallpaperGalleryDesktop({
   images,
   onClose,
   onDelete,
-  onDeleteStart,
   initialIndex = 0,
   openedImageId,
 }: WallpaperGalleryProps) {
@@ -43,12 +42,10 @@ export function WallpaperGalleryDesktop({
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [imageVisible, setImageVisible] = useState(true)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isBurnReady, setIsBurnReady] = useState(false)
-  const [isScanning, setIsScanning] = useState(false)
   const [slideX, setSlideX] = useState(0)
   const [slideTransition, setSlideTransition] = useState(true)
   const isNavigatingRef = useRef(false)
+  const { slideStyle, beginSlideIn } = useCaptureSlideIn()
   // The capture as it is actually painted, for a close that has to draw its own
   // collapse. See handleClose.
   const captureRef = useRef<HTMLImageElement>(null)
@@ -120,9 +117,6 @@ export function WallpaperGalleryDesktop({
       setImageVisible(true)
       setSlideX(0)
       setSlideTransition(true)
-      setIsDeleting(false)
-      setIsBurnReady(false)
-      setIsScanning(false)
     }
   }, [currentIndex])
 
@@ -179,46 +173,67 @@ export function WallpaperGalleryDesktop({
     }, 150)
   }
 
+  /**
+   * The download, on the press.
+   *
+   * Not after an animation — this used to set a flag and let a 1200ms scan-line
+   * animation's completion callback do the download, which meant a button that
+   * did nothing for well over a second, and a programmatic anchor click landing
+   * outside the user-activation window that permits it.
+   *
+   * The confirmation is a toast rather than anything drawn over the capture. A
+   * motion cue is gone before you can check it, and the thing you actually want
+   * to know is whether the file left — which is a statement, not a gesture. It
+   * also survives being missed, which is the whole job here.
+   */
   const handleDownload = () => {
-    playDigitalClick("strong")
     if (!currentImage) return
-    if (prefersReducedMotion) {
-      downloadImage(currentImage.dataUrl, currentImage.params as any, currentImage.timestamp)
-      playDownloadConfirmation("strong")
-      return
-    }
-    setIsScanning(true)
-  }
-
-  const handleDelete = () => {
     playDigitalClick("strong")
-    if (currentImage) {
-      if (prefersReducedMotion) {
-        onDeleteStart?.(currentImage.id)
-        onDelete(currentImage.id)
-        return
-      }
-      setIsDeleting(true)
-      onDeleteStart?.(currentImage.id)
-    }
+    downloadImage(currentImage.dataUrl, currentImage.timestamp, currentImage.shaderId)
+    playDownloadConfirmation("strong")
+    toast.success("Image downloaded")
   }
 
-  const handleBurnReady = () => setIsBurnReady(true)
+  /**
+   * The delete, on the press.
+   *
+   * The capture leaves state immediately; the two halves of the motion are drawn
+   * over the top of a list that has already changed. The outgoing frame recedes
+   * and fades from the app root (see CaptureDismissal) because removing the last
+   * capture closes the gallery on this same frame and the exit has to outlive
+   * that unmount. The incoming one is stepped to here.
+   *
+   * Which way the strip steps is the decision worth writing down. The index is
+   * moved *back* one rather than left where it is, so what fills the slot is the
+   * capture before the deleted one and it enters from the left, where it has
+   * been sitting all along. Holding the index instead would pull the *next*
+   * capture leftwards into the gap, which is the correct thing for a list and the
+   * wrong thing for a strip of film: nothing on a strip moves backwards. The
+   * oldest capture is the one case with nothing behind it, so there the newer one
+   * comes in from the right and the strip steps forward for once.
+   */
+  const handleDelete = () => {
+    if (!currentImage) return
+    playDigitalClick("strong")
 
-  const handleBurnComplete = () => {
-    if (currentImage) {
-      setImageVisible(false)
-      onDelete(currentImage.id)
-      const newLength = images.length - 1
-      if (newLength === 0) {
-        setTimeout(() => onClose(), 150)
-      } else if (currentIndex >= newLength) {
-        setCurrentIndex(newLength - 1)
-      }
-      setIsDeleting(false)
-      setIsBurnReady(false)
-      setTimeout(() => setImageVisible(true), 50)
-    }
+    const src = currentImage.dataUrl
+    // Both read before the removal, while this capture is still the one painted.
+    const rect = prefersReducedMotion ? undefined : captureRef.current?.getBoundingClientRect()
+    const wasLast = images.length === 1
+    const stepsBack = currentIndex > 0
+
+    onDelete(currentImage.id)
+    dismissCapture(src, rect, wasLast)
+
+    // Nothing to step to: the list is empty and the effect above is already
+    // closing the gallery.
+    if (wasLast) return
+    // Above the motion check, because which capture fills the slot is not a
+    // motion decision. Reduced motion takes the same step; it just arrives
+    // already there.
+    setCurrentIndex(stepsBack ? currentIndex - 1 : 0)
+    if (prefersReducedMotion) return
+    beginSlideIn(stepsBack ? -1 : 1)
   }
 
   const handleClose = () => {
@@ -230,16 +245,6 @@ export function WallpaperGalleryDesktop({
     const strayed = currentImage.id !== openedImageId && !prefersReducedMotion
     onClose(strayed ? closeFlightFrom(captureRef.current, currentImage) : undefined)
   }
-
-  const handleScanComplete = () => {
-    if (currentImage) {
-      downloadImage(currentImage.dataUrl, currentImage.params as any, currentImage.timestamp)
-      playDownloadConfirmation("strong")
-      setIsScanning(false)
-    }
-  }
-
-  const displayCount = isDeleting ? Math.max(0, images.length - 1) : images.length
 
   const reducedTransition = { duration: 0.15, ease: "easeInOut" as const }
   const morphTransition = prefersReducedMotion ? reducedTransition : galleryMorph
@@ -294,18 +299,27 @@ export function WallpaperGalleryDesktop({
             // itself. The image is a projection node now, so Framer owns its
             // transform for the length of the morph; a second transform on the
             // same element would be overwritten mid-flight and fight the spring.
+            //
+            // A delete's arrival rides here too, and simply takes the wrapper
+            // over while it lasts — the two can never overlap, because a step
+            // through the strip and a step caused by a deletion are both a change
+            // of index and there is only one of those at a time. Kept at full
+            // opacity throughout: the arriving capture is not crossfading with
+            // anything, it is walking in front of a backdrop.
             <div
               className="absolute inset-0"
               style={
                 prefersReducedMotion
                   ? { opacity: imageVisible ? 1 : 0, transition: "opacity 150ms ease-in-out" }
-                  : {
-                      opacity: isBurnReady ? 0 : imageVisible ? 1 : 0,
-                      transform: `translateX(${slideX}px)`,
-                      transition: slideTransition
-                        ? "transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out"
-                        : "none",
-                    }
+                  : slideStyle
+                    ? { opacity: 1, ...slideStyle }
+                    : {
+                        opacity: imageVisible ? 1 : 0,
+                        transform: `translateX(${slideX}px)`,
+                        transition: slideTransition
+                          ? "transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out"
+                          : "none",
+                      }
               }
             >
               {/* Two nested layoutIds, and the pair is the whole trick. The card
@@ -349,17 +363,6 @@ export function WallpaperGalleryDesktop({
             </div>
           )}
 
-          {isDeleting && currentImage && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-              <BurningImage src={currentImage.dataUrl} onComplete={handleBurnComplete} onReady={handleBurnReady} />
-            </div>
-          )}
-
-          {isScanning && currentImage && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-              <ScanLineOverlay src={currentImage.dataUrl} onComplete={handleScanComplete} />
-            </div>
-          )}
         </div>
       )}
 
@@ -375,7 +378,7 @@ export function WallpaperGalleryDesktop({
             : { duration: 0.18, delay: 0.3, ease: "easeOut" }
         }
       >
-        {displayCount > 0 && (
+        {images.length > 0 && (
           <Button
             onClick={(e) => { e.stopPropagation(); handleClose() }}
             variant="ghost"
@@ -417,7 +420,7 @@ export function WallpaperGalleryDesktop({
               </>
             )}
 
-            {displayCount > 0 && (
+            {images.length > 0 && (
               <div className="absolute top-4 left-4 flex gap-2">
                 <Button
                   onClick={(e) => { e.stopPropagation(); handleDelete() }}

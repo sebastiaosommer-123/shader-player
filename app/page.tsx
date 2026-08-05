@@ -12,7 +12,9 @@ import type { ShaderParams } from "@/lib/shader-uniforms"
 import type { CapturedImage } from "@/lib/types"
 import { encodeFullResolution, freezeFrame, previewDataUrl } from "@/lib/canvas-capture"
 import { warmPngEncoder } from "@/lib/png-encoder"
+import { CaptureDismissal } from "@/components/capture-dismissal"
 import { CaptureFlash } from "@/components/capture-flash"
+import { Toaster } from "@/components/ui/sonner"
 import { captureFlash } from "@/lib/springs"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { useResizableSidebar } from "@/hooks/use-resizable-sidebar"
@@ -31,7 +33,6 @@ export default function Home() {
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [clickedImageId, setClickedImageId] = useState<string | null>(null)
-  const [deletingImageId, setDeletingImageId] = useState<string | null>(null)
   // Set when the gallery is dismissed from a capture other than the one it was
   // opened on, which is the one the thumbnail is showing. The shared-element
   // morph cannot draw that — see GalleryCloseFlight — so it is stood down for as
@@ -122,21 +123,18 @@ export default function Home() {
     }, captureFlash.durationMs + 60)
   }
 
-  const handleDeleteStart = (id: string) => {
-    setDeletingImageId(id)
-  }
-
   const handleDeleteImage = (id: string) => {
     // Nothing left to show closes the desktop slot again, which falls out of
     // hasSlot below rather than needing its own flag.
     const doomed = capturedImages.find((img) => img.id === id)
     setCapturedImages(capturedImages.filter((img) => img.id !== id))
-    setDeletingImageId(null)
 
     // The full-resolution capture is a blob the browser keeps alive until its
-    // URL is revoked. On a delay because this fires from the burn's completion,
-    // and the burning <img> is still holding the src for the frame in which it
-    // unmounts — revoking underneath it would break the last frame of the burn.
+    // URL is revoked. On a delay because this now fires on the press frame,
+    // with the evaporation of this very capture about to start — the effect
+    // already holds its pixels as a texture, but a still-unfinished prepare
+    // would be reading from this URL, and the outgoing <img> holds it for the
+    // frame in which it unmounts.
     if (doomed?.dataUrl.startsWith("blob:")) {
       const url = doomed.dataUrl
       window.setTimeout(() => URL.revokeObjectURL(url), 1000)
@@ -145,7 +143,6 @@ export default function Home() {
 
   const handleGalleryClose = (flight?: CloseFlight) => {
     setIsGalleryOpen(false)
-    setDeletingImageId(null)
     // One commit: the gallery's shared element goes out with its subtree and the
     // thumbnail leaves the layoutId stack at the same time, so the stack empties
     // rather than leaving a member behind to fly home on its own.
@@ -235,7 +232,6 @@ export default function Home() {
         onShaderChange={handleShaderChange}
         images={capturedImages}
         onThumbnailClick={handleThumbnailClick}
-        hiddenImageId={deletingImageId}
         suppressMorph={!!closeFlight}
       />
 
@@ -248,7 +244,6 @@ export default function Home() {
         onCapture={handleCapture}
         images={capturedImages}
         onThumbnailClick={handleThumbnailClick}
-        hiddenImageId={deletingImageId}
         hasSlot={capturedImages.length > 0}
         suppressMorph={!!closeFlight}
       />
@@ -260,13 +255,37 @@ export default function Home() {
             images={capturedImages}
             onClose={handleGalleryClose}
             onDelete={handleDeleteImage}
-            onDeleteStart={handleDeleteStart}
             initialIndex={selectedImageIndex}
             openedImageId={clickedImageId}
             isMobile={isMobile}
           />
         )}
       </AnimatePresence>
+
+      {/* Where a deleted capture's exit draws. At the root rather than inside
+          the gallery because deleting the last capture closes the gallery on the
+          press frame, and the outgoing frame has to outlive that unmount. */}
+      <CaptureDismissal />
+
+      {/* Bottom-centre, where this app's chrome lives — the toolbar and the
+          mobile bar are both down there, so a message arriving at the bottom
+          reads as part of the same furniture rather than as something the
+          browser did. The toolbar is not a conflict in practice: the only thing
+          that raises a toast is the download, and the gallery is over the top of
+          the toolbar whenever that is reachable. The offset clears the home
+          indicator, since the gallery is edge to edge.
+
+          Inside this container rather than in the layout, and that is the whole
+          reason it moved here. Sonner renders where it is placed, and at the
+          layout it landed as a sibling of this div — outside the `dark` pinned
+          on it above. Mobile is dark whatever the page theme says, so a phone on
+          a light system theme resolved --surface-3 to #252525 for every other
+          surface and #fff for the toast. Same subtree, same tokens. */}
+      <Toaster
+        position="bottom-center"
+        duration={2500}
+        offset="max(1.25rem, calc(env(safe-area-inset-bottom) + 0.75rem))"
+      />
 
       {/* Outside the AnimatePresence above on purpose: the gallery is unmounted
           as soon as its backdrop has finished fading, a good 200ms before this

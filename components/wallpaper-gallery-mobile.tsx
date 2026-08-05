@@ -11,10 +11,11 @@ import { closeFlightFrom } from "@/components/gallery-close-flight"
 import { downloadImage } from "@/lib/canvas-capture"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { playDownloadConfirmation } from "@/lib/download-audio"
+import { toast } from "sonner"
 import { galleryMorph } from "@/lib/springs"
 import { cn } from "@/lib/utils"
-import { BurningImage } from "@/components/burning-image"
-import { ScanLineOverlay } from "@/components/scan-line-overlay"
+import { dismissCapture } from "@/components/capture-dismissal"
+import { useCaptureSlideIn } from "@/hooks/use-capture-slide-in"
 
 const galleryButtonClass =
   "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform,opacity] duration-150 active:scale-[0.97]"
@@ -26,7 +27,6 @@ interface WallpaperGalleryProps {
   images: CapturedImage[]
   onClose: (flight?: CloseFlight) => void
   onDelete: (id: string) => void
-  onDeleteStart?: (id: string) => void
   initialIndex?: number
   openedImageId: string
 }
@@ -35,7 +35,6 @@ export function WallpaperGalleryMobile({
   images,
   onClose,
   onDelete,
-  onDeleteStart,
   initialIndex = 0,
   openedImageId,
 }: WallpaperGalleryProps) {
@@ -49,12 +48,11 @@ export function WallpaperGalleryMobile({
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [imageVisible, setImageVisible] = useState(true)
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isBurnReady, setIsBurnReady] = useState(false)
-  const [isScanning, setIsScanning] = useState(false)
   // Suppresses the parallax while the shared element is in flight. True from the
   // first frame, since the gallery only ever mounts into an opening morph.
   const [isMorphing, setIsMorphing] = useState(true)
+
+  const { sliding, slideStyle, beginSlideIn } = useCaptureSlideIn()
 
   const carouselRef = useRef<BlossomCarouselHandle>(null)
   const scrollFrameRef = useRef(0)
@@ -171,17 +169,16 @@ export function WallpaperGalleryMobile({
 
   // A deletion pulls a slide out of the row from under the scroll offset, which
   // would otherwise leave the next capture sitting half off screen.
+  //
+  // Load-bearing for the delete's arrival, and this is the only reason it is a
+  // *layout* effect: handleDelete moves the index back one and the scroller has
+  // to be sitting on that slide before anything is painted. Get it wrong by a
+  // frame and the capture that was just deleted flashes back into view under its
+  // own exit.
   useLayoutEffect(() => {
     if (imageCount === 0) return
     scrollToIndex(Math.min(currentIndexRef.current, imageCount - 1), false)
   }, [imageCount, scrollToIndex])
-
-  // Scrolling to another capture abandons whatever was staged on the last one.
-  useEffect(() => {
-    setIsDeleting(false)
-    setIsBurnReady(false)
-    setIsScanning(false)
-  }, [currentIndex])
 
   // onLayoutAnimationComplete normally beats this; it is here so a morph that
   // never reports back cannot leave the parallax switched off for good.
@@ -210,46 +207,72 @@ export function WallpaperGalleryMobile({
     scrollToIndex(Math.min(currentIndex + 1, imageCount - 1), !prefersReducedMotion)
   }
 
+  /**
+   * The download, on the press.
+   *
+   * Not after an animation — this used to set a flag and let a 1200ms scan-line
+   * animation's completion callback do the download, which meant a button that
+   * did nothing for well over a second, and a programmatic anchor click landing
+   * outside the user-activation window that permits it.
+   *
+   * The confirmation is a toast rather than anything drawn over the capture. A
+   * motion cue is gone before you can check it, and the thing you actually want
+   * to know is whether the file left — which is a statement, not a gesture. It
+   * also survives being missed, which is the whole job here.
+   */
   const handleDownload = () => {
-    playDigitalClick("strong")
     if (!currentImage) return
-    if (prefersReducedMotion) {
-      downloadImage(currentImage.dataUrl, currentImage.params as any, currentImage.timestamp)
-      playDownloadConfirmation("strong")
-      return
-    }
-    setIsScanning(true)
-  }
-
-  const handleDelete = () => {
     playDigitalClick("strong")
-    if (currentImage) {
-      if (prefersReducedMotion) {
-        onDeleteStart?.(currentImage.id)
-        onDelete(currentImage.id)
-        return
-      }
-      setIsDeleting(true)
-      onDeleteStart?.(currentImage.id)
-    }
+    downloadImage(currentImage.dataUrl, currentImage.timestamp, currentImage.shaderId)
+    playDownloadConfirmation("strong")
+    toast.success("Image downloaded")
   }
 
-  const handleBurnReady = () => setIsBurnReady(true)
+  /**
+   * The delete, on the press.
+   *
+   * The capture leaves state immediately; the two halves of the motion are drawn
+   * over the top of a list that has already changed. The outgoing frame recedes
+   * and fades from the app root (see CaptureDismissal) because removing the last
+   * capture closes the gallery on this same frame and the exit has to outlive
+   * that unmount. The incoming one is stepped to here.
+   *
+   * Which way the strip steps is the decision worth writing down. The index is
+   * moved *back* one rather than left where it is, so what fills the slot is the
+   * capture before the deleted one, arriving from the left where it has been
+   * sitting all along. Holding the index instead would pull the *next* capture
+   * leftwards into the gap, which is the correct thing for a list and the wrong
+   * thing for a strip of film: nothing on a strip moves backwards. The oldest
+   * capture is the one case with nothing behind it, so there the newer one comes
+   * in from the right and the strip steps forward for once.
+   *
+   * The scroller is jumped onto the new slide rather than scrolled to it — see
+   * the re-centring effect. What the eye reads as travel is the card inside that
+   * slide crossing its own box; the scroll is already over before the first frame
+   * of it is painted.
+   */
+  const handleDelete = () => {
+    if (!currentImage) return
+    playDigitalClick("strong")
 
-  const handleBurnComplete = () => {
-    if (currentImage) {
-      setImageVisible(false)
-      onDelete(currentImage.id)
-      const newLength = imageCount - 1
-      if (newLength === 0) {
-        setTimeout(() => onClose(), 150)
-      } else if (currentIndex >= newLength) {
-        setCurrentIndex(newLength - 1)
-      }
-      setIsDeleting(false)
-      setIsBurnReady(false)
-      setTimeout(() => setImageVisible(true), 50)
-    }
+    const src = currentImage.dataUrl
+    // Both read before the removal, while this capture is still the one painted.
+    const rect = prefersReducedMotion ? undefined : captureRef.current?.getBoundingClientRect()
+    const wasLast = imageCount === 1
+    const stepsBack = currentIndex > 0
+
+    onDelete(currentImage.id)
+    dismissCapture(src, rect, wasLast)
+
+    // Nothing to step to: the list is empty and the effect above is already
+    // closing the gallery.
+    if (wasLast) return
+    // Above the motion check, because which capture fills the slot is not a
+    // motion decision. Reduced motion takes the same step; the scroller just
+    // jumps there and no card is ever offset.
+    setCurrentIndex(stepsBack ? currentIndex - 1 : 0)
+    if (prefersReducedMotion) return
+    beginSlideIn(stepsBack ? -1 : 1)
   }
 
   const handleClose = () => {
@@ -265,16 +288,6 @@ export function WallpaperGalleryMobile({
     setIsMorphing(true)
     onClose(flight)
   }
-
-  const handleScanComplete = () => {
-    if (currentImage) {
-      downloadImage(currentImage.dataUrl, currentImage.params as any, currentImage.timestamp)
-      playDownloadConfirmation("strong")
-      setIsScanning(false)
-    }
-  }
-
-  const displayCount = isDeleting ? Math.max(0, imageCount - 1) : imageCount
 
   const reducedTransition = { duration: 0.15, ease: "easeInOut" as const }
   const morphTransition = prefersReducedMotion ? reducedTransition : galleryMorph
@@ -342,9 +355,6 @@ export function WallpaperGalleryMobile({
             style={{
               opacity: imageVisible ? 1 : 0,
               transition: prefersReducedMotion ? "opacity 150ms ease-in-out" : "opacity 180ms ease-out",
-              // A burn or a scan owns the frame until it finishes; scrolling out
-              // from under one would leave its subject already half deleted.
-              pointerEvents: isDeleting || isScanning ? "none" : undefined,
             }}
           >
             {/* Every capture is on screen at once, in a real scroll container, so
@@ -354,6 +364,7 @@ export function WallpaperGalleryMobile({
               ref={carouselRef}
               className="gallery-carousel"
               data-morphing={isMorphing ? "true" : undefined}
+              data-deleting={sliding ? "true" : undefined}
               onScroll={handleScroll}
               aria-label="Captured frames"
             >
@@ -364,9 +375,22 @@ export function WallpaperGalleryMobile({
                   ref={index === initialIndex ? seedScroll : undefined}
                   className="gallery-slide"
                 >
+                  {/* The arriving capture crosses its own slide, and the slide's
+                      overflow:hidden is what makes that read as travel rather
+                      than as an image wandering over its neighbours: a slide is
+                      exactly one scrollport wide, so clipping to it is clipping
+                      to the screen, and the half of the card still off to the
+                      left is off the left-hand edge of the phone.
+
+                      Nothing else needs hiding while this runs. The row has
+                      already been jumped onto this slide, so its neighbours are
+                      exactly one screen out on either side and the scroller
+                      clips them — including the slide the deleted capture used to
+                      occupy, which is why the strip can step back without the
+                      next capture ever showing itself. */}
                   <div
                     className="gallery-card"
-                    style={isBurnReady && index === currentIndex ? { opacity: 0 } : undefined}
+                    style={sliding && index === currentIndex ? slideStyle : undefined}
                   >
                     {/* Every capture is sized to the letterboxed rect it actually
                         occupies rather than stretched across the slide and left
@@ -434,17 +458,6 @@ export function WallpaperGalleryMobile({
             </BlossomCarousel>
           </div>
 
-          {isDeleting && currentImage && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-              <BurningImage src={currentImage.dataUrl} onComplete={handleBurnComplete} onReady={handleBurnReady} />
-            </div>
-          )}
-
-          {isScanning && currentImage && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-              <ScanLineOverlay src={currentImage.dataUrl} onComplete={handleScanComplete} />
-            </div>
-          )}
         </div>
       )}
 
@@ -460,7 +473,7 @@ export function WallpaperGalleryMobile({
             : { duration: 0.18, delay: 0.3, ease: "easeOut" }
         }
       >
-        {displayCount > 0 && (
+        {imageCount > 0 && (
           <Button
             onClick={(e) => { e.stopPropagation(); handleClose() }}
             variant="ghost"
@@ -506,7 +519,7 @@ export function WallpaperGalleryMobile({
               </>
             )}
 
-            {displayCount > 0 && (
+            {imageCount > 0 && (
               <div className="absolute top-4 left-4 flex gap-2">
                 <Button
                   onClick={(e) => { e.stopPropagation(); handleDelete() }}

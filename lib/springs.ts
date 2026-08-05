@@ -66,6 +66,97 @@ export const galleryMorph = {
   bounce: 0.08,
 } as const;
 
+/**
+ * The deleted capture leaving, and the one that takes its place arriving.
+ *
+ * Both gallery actions used to be gated behind an animation: the download did
+ * not download for 1200ms and the delete did not delete for 1500ms, because the
+ * real action was wired to a WebGL effect's completion callback. The action now
+ * fires on the press, which is the fix that mattered; what is left here is only
+ * how the outgoing frame gets off screen and the next one gets on.
+ *
+ * Deliberately not an *effect*. The shutter flash is ceremony because taking the
+ * picture is the point of the app; deleting a bad frame is housekeeping, and
+ * ceremony on housekeeping is what you notice on the two-hundredth time. The
+ * canvas is where this project gets to be excessive. The gallery is a tool. Two
+ * richer versions were built and cut — a fire burn and a particle dispersal —
+ * and neither failed on timing: a dispersal needs edges to read as fragments,
+ * and these captures are soft gradients with none, so it came apart into static
+ * rather than into pieces.
+ *
+ * What was left after those was a capture that dimmed 3% and blinked out over a
+ * neighbour that was simply *already there*, which is not restraint — it is a
+ * cut. So the money is spent on the one thing a delete actually has to say: the
+ * frame you removed goes, and the strip steps back onto the one before it. Two
+ * plain properties each, no effect, and the whole thing is over in 300ms.
+ */
+export const galleryEffects = {
+  /**
+   * How far the deleted capture recedes before it is gone.
+   *
+   * Not to nothing, and not by a hair either. The 0.97 this used to be is a
+   * press affordance, not an exit — at that size the capture only fades, and a
+   * fade on its own reads as the picture going dim rather than going away.
+   * Pulling back to 0.8 gives it somewhere to go, which is what makes the
+   * neighbour arriving read as a replacement rather than a swap.
+   */
+  dismissScale: 0.8,
+  /** Scale and fade on the capture that has already left state. */
+  dismissMs: 220,
+  /**
+   * Ease-out, and the delay below is what makes that safe.
+   *
+   * The trap captureFlash documents applies to any 1 → 0 fade: an ease-out
+   * spends most of the opacity in the first few frames, so the capture is half
+   * gone before it has been on screen for two, and what you register is not the
+   * picture leaving but the backdrop appearing behind it. This used to answer
+   * that with an ease-*in* on both properties, which worked while the exit was
+   * only a fade.
+   *
+   * It stops working once the capture also moves. Ease-in on a transform is
+   * dead for its first half — 110ms in, a capture on its way to 0.8 has barely
+   * left 0.97 — and dead frames immediately after a press read as latency, not
+   * as restraint. So the transform gets the ease-out it wants, and the fade
+   * gets the hold it wants from a delay instead of from a curve.
+   */
+  dismissEase: "cubic-bezier(0.23, 1, 0.32, 1)",
+  /**
+   * How long the capture holds full opacity while it is already shrinking.
+   *
+   * Two frames, which is all the hold ever needed to be: long enough that the
+   * picture is unmistakably the thing that moved first, short enough that it is
+   * gone well before the capture replacing it lands.
+   */
+  dismissFadeDelayMs: 60,
+  /**
+   * The neighbour arriving in the deleted capture's place — a full slide, one
+   * screen wide, from the side of the strip it actually lives on.
+   *
+   * Longer than anything else here because it is the only thing in the gallery
+   * that crosses the whole screen, and the curve is the one iOS uses for a
+   * full-screen push: nearly all the distance in the first half, then a long
+   * quiet settle. A strong ease-out over a viewport width is the difference
+   * between the strip stepping back and a card being thrown at you.
+   *
+   * It outlasts the exit on purpose. The capture you deleted is gone by 220ms
+   * and the one that replaced it is still arriving, so the last thing the eye
+   * follows is the picture that stayed.
+   */
+  replaceMs: 300,
+  replaceEase: "cubic-bezier(0.32, 0.72, 0, 1)",
+  /**
+   * How long the backdrop lingers after the *last* capture has dissolved.
+   *
+   * Only ever used for that one case, and it exists because the gallery cannot
+   * cover it itself: emptying the list makes the viewer render null on the same
+   * commit, so its own backdrop is gone a frame before the exit begins and the
+   * capture would be dissolving against the live shader. Held opaque for the
+   * length of the exit and dropped afterwards, the order reads properly — the
+   * picture goes, and only then does the canvas come back.
+   */
+  dismissBackdropMs: 220,
+} as const;
+
 // Fallback delay (ms) for deferred-unmount timers that guard an exit tween:
 // popups keep their portal mounted until onAnimationComplete fires, but a
 // throttled/background tab can stall the animation, so a timer force-unmounts

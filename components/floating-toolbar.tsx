@@ -17,7 +17,6 @@ interface FloatingToolbarProps {
   onCapture: () => void
   images: CapturedImage[]
   onThumbnailClick: (imageIndex: number) => void
-  hiddenImageId?: string | null
   /** Whether to render the thumbnail slot at all — see app/page.tsx. */
   hasSlot: boolean
   /** Passed straight through to the thumbnail; see CaptureThumbnail. */
@@ -39,7 +38,6 @@ export function FloatingToolbar({
   onCapture,
   images,
   onThumbnailClick,
-  hiddenImageId,
   hasSlot,
   suppressMorph,
 }: FloatingToolbarProps) {
@@ -49,13 +47,12 @@ export function FloatingToolbar({
   const isMobile = useIsMobile()
   const prefersReducedMotion = useReducedMotion()
 
-  const visibleImages = hiddenImageId ? images.filter((img) => img.id !== hiddenImageId) : images
-  const latestImage = visibleImages[visibleImages.length - 1]
+  const latestImage = images[images.length - 1]
   const showThumbnail = !isMobile && !!latestImage
 
   const handleThumbnailClick = () => {
     const originalIndex = images.findIndex((img) => img.id === latestImage.id)
-    onThumbnailClick(originalIndex !== -1 ? originalIndex : visibleImages.length - 1)
+    onThumbnailClick(originalIndex !== -1 ? originalIndex : images.length - 1)
   }
 
   return (
@@ -112,7 +109,7 @@ export function FloatingToolbar({
         {showThumbnail && (
           <CaptureSlot
             image={latestImage}
-            previous={visibleImages[visibleImages.length - 2]}
+            previous={images[images.length - 2]}
             width={SLOT_SIZE}
             height={SLOT_SIZE}
             radius={SLOT_RADIUS}

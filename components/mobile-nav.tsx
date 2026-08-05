@@ -29,7 +29,6 @@ interface MobileNavProps {
   onShaderChange: (shaderId: string) => void
   images: CapturedImage[]
   onThumbnailClick: (imageIndex: number) => void
-  hiddenImageId?: string | null
   /** Passed straight through to the thumbnail; see CaptureThumbnail. */
   suppressMorph?: boolean
 }
@@ -42,7 +41,6 @@ export function MobileNav({
   onShaderChange,
   images,
   onThumbnailClick,
-  hiddenImageId,
   suppressMorph,
 }: MobileNavProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -58,15 +56,12 @@ export function MobileNav({
     transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
   })
 
-  const visibleImages = hiddenImageId
-    ? images.filter((img) => img.id !== hiddenImageId)
-    : images
-  const latestImage = visibleImages[visibleImages.length - 1]
+  const latestImage = images[images.length - 1]
   const showThumbnail = isMobile && !!latestImage
 
   const handleThumbnailClick = () => {
     const originalIndex = images.findIndex((img) => img.id === latestImage.id)
-    onThumbnailClick(originalIndex !== -1 ? originalIndex : visibleImages.length - 1)
+    onThumbnailClick(originalIndex !== -1 ? originalIndex : images.length - 1)
   }
 
   return (
@@ -119,7 +114,7 @@ export function MobileNav({
               {showThumbnail && (
                 <CaptureSlot
                   image={latestImage}
-                  previous={visibleImages[visibleImages.length - 2]}
+                  previous={images[images.length - 2]}
                   width={THUMBNAIL_SIZE}
                   height={THUMBNAIL_SIZE}
                   radius={THUMBNAIL_RADIUS}

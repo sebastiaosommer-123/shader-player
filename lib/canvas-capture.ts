@@ -1,5 +1,5 @@
-import type { ShaderParams } from "./shader-uniforms"
 import { encodePng } from "./png-encoder"
+import { SHADER_CONFIGS } from "./shader-configs"
 
 /**
  * Long edge of the instant preview.
@@ -60,23 +60,49 @@ export async function encodeFullResolution(frozen: HTMLCanvasElement): Promise<s
   return blob ? URL.createObjectURL(blob) : null
 }
 
-export function downloadImage(dataUrl: string, params: ShaderParams, timestamp: number, shaderId?: string) {
-  const link = document.createElement("a")
+/** Lowercase and hyphenated, so a display name is safe to put in a filename. */
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+/**
+ * The name a downloaded capture lands under: `shader-haze-2026-08-04-211822.png`.
+ *
+ * **24-hour and zero-padded, which is the whole point of the format.** The
+ * previous one wrote a 12-hour clock with an unpadded hour and AM/PM on the end
+ * — `9-18-22PM` — and that does not sort. A file browser ordering by name puts
+ * `10-…AM` above `9-…AM`, because it compares "1" against "9", and puts every
+ * afternoon shot among the mornings because the meridiem is the last thing it
+ * reads. A folder of these came out in an order with no meaning. Padded 24-hour
+ * makes filename order and chronological order the same thing, permanently.
+ *
+ * The shader is in there because the alternative was throwing it away: this
+ * function already took a `shaderId` that no caller passed and the body never
+ * read. Naming it means a folder of wallpapers says what made each one, and
+ * putting it ahead of the timestamp groups the collection by shader with each
+ * group in order inside itself.
+ *
+ * Looked up against SHADER_CONFIGS rather than through getShaderConfig, which
+ * falls back to terracotta for an id it does not know — a sensible default when
+ * you need a shader to render, and the wrong one here, where it would quietly
+ * label the file "haze". An unrecognised id drops the segment instead.
+ */
+export function downloadImage(dataUrl: string, timestamp: number, shaderId?: string) {
   const date = new Date(timestamp)
+  const pad = (value: number) => String(value).padStart(2, "0")
+  const stamp =
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
 
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  let hours = date.getHours()
-  const minutes = String(date.getMinutes()).padStart(2, "0")
-  const seconds = String(date.getSeconds()).padStart(2, "0")
-  const ampm = hours >= 12 ? "PM" : "AM"
-  hours = hours % 12
-  hours = hours ? hours : 12 // 0 should be 12
-  const dateString = `${year}-${month}-${day}-${hours}-${minutes}-${seconds}${ampm}`
+  const shaderName = shaderId ? SHADER_CONFIGS[shaderId]?.name : undefined
+  const parts = ["shader", shaderName ? slugify(shaderName) : "", stamp].filter(Boolean)
 
+  const link = document.createElement("a")
   link.href = dataUrl
-  link.download = `shader-capture-${dateString}.png`
+  link.download = `${parts.join("-")}.png`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

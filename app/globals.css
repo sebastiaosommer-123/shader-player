@@ -405,8 +405,17 @@ input[type="range"]::-moz-range-thumb {
 /* Held while the thumbnail morphs in or out. A settled slide sits on the 50%
    keyframe — an identity transform — so the morph usually has nothing to fight;
    this is for closing mid-scroll, where the active card would otherwise still be
-   offset underneath Framer's measurement. */
-.gallery-carousel[data-morphing="true"] .gallery-card {
+   offset underneath Framer's measurement.
+
+   Held for a delete's arrival too, and there it is not a precaution but the
+   whole mechanism: the card is about to be handed an inline transform of its
+   own, and a running animation outranks anything inline. The scroll has nothing
+   to say during that step in any case — it was jumped, not scrolled, and the
+   travel the eye follows is a clock's. The inline transform wins over the
+   `transform: none` here on specificity, which is what leaves the cards that are
+   not arriving sitting at rest. */
+.gallery-carousel[data-morphing="true"] .gallery-card,
+.gallery-carousel[data-deleting="true"] .gallery-card {
   animation: none;
   transform: none;
 }
@@ -472,5 +481,21 @@ input[type="range"]::-moz-range-thumb {
     width: 100%;
     height: 100%;
     touch-action: none;
+  }
+}
+
+/* Sonner's own mobile rule pins the toast container with left, right *and*
+   width: 100% at once, which is over-constrained — width wins, the right edge is
+   ignored, and the container hangs 16px past the viewport. Harmless while the
+   toast was the container's full fixed width, visible the moment it became
+   fit-content and centred: it centres inside a box that is itself off-centre.
+   Dropping the width lets both insets apply.
+
+   The selector is doubled to outrank Sonner's own, which is a single attribute
+   at the same specificity but injected into the head at runtime — so it lands
+   after this sheet and wins every tie. */
+@media (max-width: 600px) {
+  [data-sonner-toaster][data-sonner-toaster] {
+    width: auto;
   }
 }
