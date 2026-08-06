@@ -420,6 +420,7 @@ export function GalleryThumbnailStrip({
     <nav
       ref={scrollRef}
       aria-label="Captured images"
+      data-gallery-thumbnail-strip={orientation}
       className={cn(
         "pointer-events-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         isVertical

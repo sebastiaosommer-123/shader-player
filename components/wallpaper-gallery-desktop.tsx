@@ -141,7 +141,15 @@ export function WallpaperGalleryDesktop({
     const handleWheel = (event: WheelEvent) => {
       // Listening on window means the gallery responds immediately wherever the
       // pointer happens to be; clicking or focusing the artwork is never part of
-      // the interaction. Horizontal trackpad gestures and pinch zoom stay free.
+      // the interaction. The thumbnail rail is the exception: wheel input there
+      // belongs to its native scroller and must not change the selected image.
+      // Horizontal trackpad gestures and pinch zoom stay free everywhere.
+      if (
+        event.target instanceof Element &&
+        event.target.closest('[data-gallery-thumbnail-strip="vertical"]')
+      ) {
+        return
+      }
       if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
       event.preventDefault()
 
