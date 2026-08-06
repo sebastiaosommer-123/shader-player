@@ -2,81 +2,51 @@
 
 import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
-import { Monitor, Moon, Sun } from "lucide-react"
+import { Moon, Sun } from "lucide-react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { FluidTooltip } from "@/components/ui/tooltip"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { spring } from "@/lib/springs"
 
-/**
- * Three states, not two. A sun/moon toggle can only express the two overrides,
- * so the first click strands the user off `system` with no way back — and
- * `system` is the one setting that respects an OS-level preference that may
- * have been made for photophobia rather than taste. Cycling keeps it reachable
- * at the same one-click cost.
- *
- * Deliberately no time-of-day default either: the OS already switches on real
- * sunset for the user's location and publishes the result through
- * `prefers-color-scheme`, which `system` reads. A clock heuristic here would
- * be a worse copy of that, and would disagree with it for hours at a time.
- */
-const ORDER = ["system", "light", "dark"] as const
-type Appearance = (typeof ORDER)[number]
-
-const ICONS: Record<Appearance, typeof Sun> = {
-  system: Monitor,
-  light: Sun,
-  dark: Moon,
-}
-
-const LABELS: Record<Appearance, string> = {
-  system: "Appearance: match system",
-  light: "Appearance: light",
-  dark: "Appearance: dark",
-}
-
 export function AppearanceToggle() {
   const [mounted, setMounted] = useState(false)
-  const { theme, setTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
   const prefersReducedMotion = useReducedMotion()
 
   useEffect(() => setMounted(true), [])
 
-  // `theme` is undefined until next-themes reads storage on the client, and
-  // rendering a guessed icon before then would flash the wrong one.
-  const current: Appearance = mounted && ORDER.includes(theme as Appearance) ? (theme as Appearance) : "system"
-  const Icon = ICONS[current]
+  // System preference remains the unsaved default. Once the user clicks, the
+  // resolved opposite is stored as an explicit light or dark preference.
+  const targetTheme = resolvedTheme === "dark" ? "light" : "dark"
+  const Icon = targetTheme === "dark" ? Moon : Sun
+  const label = mounted ? `Switch to ${targetTheme} mode` : "Appearance"
 
   const handleClick = () => {
     void playDigitalClick("medium")
-    setTheme(ORDER[(ORDER.indexOf(current) + 1) % ORDER.length])
+    setTheme(targetTheme)
   }
 
   return (
-    <FluidTooltip content={mounted ? LABELS[current] : "Appearance"} side="top">
+    <FluidTooltip content={label} side="top">
       <button
         type="button"
         onClick={handleClick}
-        // The label carries the state, not just the control's name: an
-        // icon-only button that cycles gives a screen reader no other way to
-        // know which of the three it is currently on.
-        aria-label={mounted ? LABELS[current] : "Appearance"}
+        aria-label={label}
         // The negative margin preserves the 16px glyph's right-edge alignment
         // while allowing the circular hit target to grow to 44px.
         className="-mr-[14px] shrink-0 flex size-11 items-center justify-center rounded-full text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hoverFine:text-foreground hoverFine:bg-foreground/[0.06] active:scale-[0.97] motion-reduce:transition-none"
       >
-        {/* The icon swaps rather than morphs — three unrelated glyphs have no
-            shared shape to tween — so it cross-fades on a short rise. */}
+        {/* The icon names the action, matching the tooltip and accessible name. */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
-            key={current}
+            key={mounted ? targetTheme : "unresolved"}
             initial={prefersReducedMotion ? false : { opacity: 0, y: 3 }}
             animate={{ opacity: 1, y: 0 }}
             exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -3, transition: spring.fast.exit }}
             transition={spring.fast}
             className="flex"
           >
-            <Icon className="size-4" strokeWidth={1.7} />
+            {mounted ? <Icon className="size-4" strokeWidth={1.7} /> : <span className="size-4" />}
           </motion.span>
         </AnimatePresence>
       </button>
