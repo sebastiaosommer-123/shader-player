@@ -125,6 +125,15 @@ export function GalleryThumbnailStrip({
   const pointerRef = useRef(0)
   const clientYRef = useRef<number | null>(null)
   const activeRef = useRef(false)
+  /**
+   * The image index a pointer press just aimed at, for the centring effect below
+   * to decline.
+   *
+   * An index rather than a boolean latch. Pressing the frame that is already
+   * selected changes no state, so the effect never runs to clear a flag, and the
+   * stale `true` would then swallow the next wheel step's scroll.
+   */
+  const pointerSelectRef = useRef<number | null>(null)
   const scaleScratch = useRef<number[]>([])
   const spreadScratch = useRef<number[]>([])
 
@@ -259,8 +268,53 @@ export function GalleryThumbnailStrip({
     driveStrength(0)
   }, [driveStrength])
 
-  // Keyboard parity: focusing a frame puts the cursor at its centre.
-  const focusField = (displayIndex: number) => {
+  /**
+   * Blur, which is the keyboard leaving a frame — and only that.
+   *
+   * The same guard as `focusField`'s first one, and it has to be here for the
+   * same reason: `releaseField` answers two different questions, and a mouse
+   * click asks the wrong one. Clicking a second frame blurs the first, and the
+   * blur was tearing the whole field down — strength to zero, `clientYRef`
+   * cleared — with the cursor still sitting in the rail. Focus then landing on
+   * the new frame is refused, correctly, so nothing switched the field back on
+   * and it stayed dark until the mouse moved.
+   *
+   * This is older than the guards above; those only exposed it. `focusField`
+   * used to re-activate unconditionally, so the release and the re-activation
+   * cancelled out within one click and the field never visibly dropped.
+   *
+   * Leaving with the pointer still goes through `releaseField` directly, on the
+   * rail's own `pointerleave`. That is the event that means the cursor is gone.
+   */
+  const blurField = useCallback(() => {
+    if (clientYRef.current !== null) return
+    releaseField()
+  }, [releaseField])
+
+  /**
+   * Keyboard parity: focusing a frame puts the cursor at its centre.
+   *
+   * Both guards are load-bearing, and the first is the one that fixes the click.
+   * A mouse press focuses the button — that is Chrome's behaviour, not ours — so
+   * without them a click re-anchored the field from wherever the cursor actually
+   * was to the frame's exact centre, instantly and with no transition, because
+   * these are motion values written straight through. Clicking a frame's top edge
+   * moved the whole strip. It also cleared `clientYRef`, which is what the scroll
+   * listener needs to keep tracking, so the field then froze for the length of the
+   * scroll and snapped back the moment the mouse moved a pixel.
+   *
+   * A live cursor in the rail therefore owns the field outright: it is a stronger
+   * claim than focus, and a click is always preceded by `pointermove` in here, so
+   * the ref is the reliable signal. That also settles tabbing while the mouse
+   * rests over the rail, where the cursor is still what the eye is following.
+   *
+   * `:focus-visible` then catches what the cursor check cannot see — a tap on a
+   * touchscreen laptop, which lands on this rail because the desktop/mobile split
+   * is a width check, and which should magnify nothing.
+   */
+  const focusField = (displayIndex: number, node: HTMLElement) => {
+    if (clientYRef.current !== null) return
+    if (!node.matches(":focus-visible")) return
     const center = geometryRef.current.centers[displayIndex]
     if (center === undefined) return
     pointerRef.current = center
@@ -319,10 +373,28 @@ export function GalleryThumbnailStrip({
     }
   }, [applyField, isVertical, measure, prefersReducedMotion, trackPointer])
 
+  /**
+   * Keep the current frame centred — unless you pointed at it.
+   *
+   * The rail has to follow a selection it did not cause: step with the wheel or
+   * the arrow keys and the current capture would otherwise drift off the end.
+   * A press is the one case where it must not, because the frame you pressed was
+   * by definition already under your cursor, and scrolling it to the centre slides
+   * the entire strip out from under a hand that has not moved. Nothing needs
+   * revealing after a direct hit.
+   *
+   * Read and cleared unconditionally, which is what makes a stale value harmless:
+   * a press that never became a selection — press, drag off the frame, release —
+   * is discarded by the next index change instead of suppressing it.
+   */
   useEffect(() => {
+    const pointerSelected = pointerSelectRef.current
+    pointerSelectRef.current = null
+
     const scroller = scrollRef.current
     const item = itemRefs.current[displayIndexOf(currentIndex)]
     if (!scroller || !item) return
+    if (pointerSelected === currentIndex) return
 
     const itemCenter =
       orientation === "vertical"
@@ -389,8 +461,14 @@ export function GalleryThumbnailStrip({
               registerNode={registerNode}
               registerValues={registerValues}
               onSelect={() => onSelect(imageIndex)}
+              // On the press, not the click: keyboard activation fires `click`
+              // without a `pointerdown`, so Enter on a focused frame keeps the
+              // scroll that puts it in view.
+              onPressFrame={() => {
+                pointerSelectRef.current = imageIndex
+              }}
               onFocusFrame={focusField}
-              onBlurFrame={releaseField}
+              onBlurFrame={blurField}
             />
           )
         })}
@@ -411,7 +489,8 @@ interface GalleryThumbnailFrameProps {
   registerNode: (displayIndex: number, node: HTMLButtonElement | null) => void
   registerValues: (displayIndex: number, values: FrameValues | null) => void
   onSelect: () => void
-  onFocusFrame: (displayIndex: number) => void
+  onPressFrame: () => void
+  onFocusFrame: (displayIndex: number, node: HTMLElement) => void
   onBlurFrame: () => void
 }
 
@@ -437,6 +516,7 @@ function GalleryThumbnailFrame({
   registerNode,
   registerValues,
   onSelect,
+  onPressFrame,
   onFocusFrame,
   onBlurFrame,
 }: GalleryThumbnailFrameProps) {
@@ -478,7 +558,8 @@ function GalleryThumbnailFrame({
       // `scale`, and whichever landed last used to win.
       transition={prefersReducedMotion ? { duration: 0 } : PRESS_SPRING}
       whileTap={prefersReducedMotion || isVertical ? undefined : { scale: 0.97 }}
-      onFocus={isVertical ? () => onFocusFrame(displayIndex) : undefined}
+      onPointerDown={isVertical ? onPressFrame : undefined}
+      onFocus={isVertical ? (event) => onFocusFrame(displayIndex, event.currentTarget) : undefined}
       onBlur={isVertical ? onBlurFrame : undefined}
       onClick={onSelect}
     >
