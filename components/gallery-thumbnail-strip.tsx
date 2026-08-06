@@ -545,11 +545,23 @@ function GalleryThumbnailFrame({
       type="button"
       aria-label={label}
       aria-current={selected ? "true" : undefined}
+      // p-1 on the rail rather than p-0.5, and that is what buys the gap. The
+      // selection ring is `inset-0`, which resolves to this button's *padding*
+      // box, so the padding is the only room its 2px stroke has to live in —
+      // at 2px the stroke consumed all of it and sat flush against the picture.
+      // 4px is stroke plus the 2px of daylight the radii below are drawn for.
+      //
+      // The button's own box stays 80×56: the rail's pitch, the measured
+      // geometry, and the peak-scale fit (80 × 1.34 inside 112px) are all
+      // reckoned off it, so the gap is taken out of the picture rather than
+      // added to the frame.
       className={cn(
-        "group relative shrink-0 cursor-pointer border-2 p-0.5 outline-none",
+        "group relative shrink-0 cursor-pointer border-2 outline-none",
         "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
         "border-transparent",
-        isVertical ? "h-14 w-20 origin-right" : "h-16 w-[5.75rem] rounded-[5px]",
+        isVertical
+          ? "h-14 w-20 origin-right rounded-[10px] p-1"
+          : "h-16 w-[5.75rem] rounded-[5px] p-0.5",
       )}
       style={isVertical ? { scale, y } : undefined}
       // The press affordance stays on the horizontal strip's `scale` only
@@ -568,7 +580,15 @@ function GalleryThumbnailFrame({
           layoutId={`gallery-thumbnail-selection-${orientation}`}
           data-gallery-thumbnail-selection
           className="pointer-events-none absolute inset-0 z-10 border-2 border-foreground"
-          style={{ borderRadius: isVertical ? 0 : 5 }}
+          // 8, not the 6 the gap arithmetic suggests: `border-radius` describes
+          // a box's outer edge, and this box is a 2px border. The ladder runs
+          // outward from the picture, each rung adding the distance travelled —
+          // image 4, +2px gap = 6 at the stroke's inner edge, +2px stroke = 8
+          // here, +2px button border = 10 for the focus ring. Written this way
+          // CSS resolves the inner corner to 6 on its own, and every arc stays
+          // concentric; equal radii at different depths would pinch the gap
+          // shut at the corners, which is the thing that reads as wrong.
+          style={{ borderRadius: isVertical ? 8 : 5 }}
           transition={selectionTransition}
         />
       )}
@@ -582,7 +602,10 @@ function GalleryThumbnailFrame({
         <img
           src={image.dataUrl || "/placeholder.svg"}
           alt=""
-          className="block size-full rounded-[2px] object-cover"
+          className={cn(
+            "block size-full object-cover",
+            isVertical ? "rounded-[4px]" : "rounded-[2px]",
+          )}
           draggable={false}
         />
       </div>
