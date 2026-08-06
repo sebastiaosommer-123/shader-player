@@ -16,6 +16,7 @@ import { galleryMorph } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 import { dismissCapture } from "@/components/capture-dismissal"
 import { useCaptureSlideIn } from "@/hooks/use-capture-slide-in"
+import { GalleryThumbnailStrip } from "@/components/gallery-thumbnail-strip"
 
 const galleryButtonClass =
   "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform,opacity] duration-150 active:scale-[0.97]"
@@ -205,6 +206,12 @@ export function WallpaperGalleryMobile({
   const handleNext = () => {
     playDigitalClick("strong")
     scrollToIndex(Math.min(currentIndex + 1, imageCount - 1), !prefersReducedMotion)
+  }
+
+  const handleSelectImage = (index: number) => {
+    if (index === currentIndex) return
+    playDigitalClick("strong")
+    scrollToIndex(index, !prefersReducedMotion)
   }
 
   /**
@@ -473,6 +480,17 @@ export function WallpaperGalleryMobile({
             : { duration: 0.18, delay: 0.3, ease: "easeOut" }
         }
       >
+        {imageCount > 0 && (
+          <div className="absolute inset-x-0 bottom-0">
+            <GalleryThumbnailStrip
+              images={images}
+              currentIndex={currentIndex}
+              onSelect={handleSelectImage}
+              orientation="horizontal"
+            />
+          </div>
+        )}
+
         {imageCount > 0 && (
           <Button
             onClick={(e) => { e.stopPropagation(); handleClose() }}

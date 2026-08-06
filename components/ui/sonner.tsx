@@ -37,7 +37,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }
       toastOptions={{
         style: {
-          borderRadius: '12px',
+          borderRadius: '9999px',
           boxShadow: 'var(--shadow-3)',
           // Sonner sizes every toast to the container's fixed 356px, which
           // leaves "Capture saved" sitting in about two hundred pixels of

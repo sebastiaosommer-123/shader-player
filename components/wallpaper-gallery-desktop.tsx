@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { flushSync } from "react-dom"
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react"
 import { motion, useIsPresent, useReducedMotion } from "framer-motion"
-import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
+import { X, Download, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { CapturedImage } from "@/lib/types"
 import type { CloseFlight } from "@/components/gallery-close-flight"
@@ -16,9 +15,20 @@ import { closeFlightFrom } from "@/components/gallery-close-flight"
 import { cn } from "@/lib/utils"
 import { dismissCapture } from "@/components/capture-dismissal"
 import { useCaptureSlideIn } from "@/hooks/use-capture-slide-in"
+import { GalleryThumbnailStrip } from "@/components/gallery-thumbnail-strip"
 
 const galleryButtonClass =
   "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform] duration-150 active:scale-[0.97]"
+
+const WHEEL_NAVIGATION_THRESHOLD = 18
+const WHEEL_STEP_INTERVAL_MS = 100
+const WHEEL_IDLE_RESET_MS = 100
+
+function normalizedWheelDelta(event: WheelEvent): number {
+  if (event.deltaMode === 1) return event.deltaY * 16
+  if (event.deltaMode === 2) return event.deltaY * document.documentElement.clientHeight
+  return event.deltaY
+}
 
 interface WallpaperGalleryProps {
   images: CapturedImage[]
@@ -35,16 +45,17 @@ export function WallpaperGalleryDesktop({
   initialIndex = 0,
   openedImageId,
 }: WallpaperGalleryProps) {
-  // Oldest to newest, so the capture you just took is at the right-hand end and
-  // the left arrow walks back in time. Kept in step with the touch gallery,
-  // where the same order is what makes a rightward swipe reach the previous
-  // shot. The toolbar hands the index down already in this order.
+  // Captures are stored oldest to newest, but desktop presents them newest at
+  // the top. Scrolling down therefore walks back through older captures. The
+  // mobile gallery keeps the stored order for its horizontal strip.
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
-  const [imageVisible, setImageVisible] = useState(true)
-  const [slideX, setSlideX] = useState(0)
-  const [slideTransition, setSlideTransition] = useState(true)
-  const isNavigatingRef = useRef(false)
+  const currentIndexRef = useRef(initialIndex)
+  const wheelDeltaRef = useRef(0)
+  const lastWheelEventRef = useRef(0)
+  const lastWheelStepRef = useRef(0)
+  const viewerRef = useRef<HTMLDivElement>(null)
+  const viewerAnimationRef = useRef<Animation | null>(null)
   const { slideStyle, beginSlideIn } = useCaptureSlideIn()
   // The capture as it is actually painted, for a close that has to draw its own
   // collapse. See handleClose.
@@ -62,7 +73,7 @@ export function WallpaperGalleryDesktop({
    * around it is just backdrop the card has not reached yet.
    *
    * Measured from the capture on screen and not from the one the gallery was
-   * opened on, which are the same picture until you press an arrow. Two captures
+   * opened on, which are the same picture until you scroll. Two captures
    * only differ in shape if the canvas was resized between them — drag the
    * sidebar and the next shot is a different aspect ratio — and sizing every
    * capture to the *opened* one then squeezed a landscape frame into a portrait
@@ -76,7 +87,9 @@ export function WallpaperGalleryDesktop({
   const shownImage = images[currentIndex]
   const measureFitBox = useCallback(() => {
     const inset = window.matchMedia("(min-width: 768px)").matches ? 32 : 0
-    const boxWidth = Math.max(document.documentElement.clientWidth - inset * 2, 0)
+    // The filmstrip owns the rightmost 112px. Fit the capture into the actual
+    // viewer region so the rail never covers the artwork.
+    const boxWidth = Math.max(document.documentElement.clientWidth - inset * 2 - 112, 0)
     const boxHeight = Math.max(document.documentElement.clientHeight - inset * 2, 0)
     // A capture taken before the canvas was sized comes back 0×0; nothing sane
     // to fit, so let it have the whole box.
@@ -91,7 +104,7 @@ export function WallpaperGalleryDesktop({
 
   // Re-measured on a resize and on every step through the strip, since the
   // capture being stepped to may not be the shape of the one leaving.
-  useEffect(() => {
+  useLayoutEffect(() => {
     setFitBox(measureFitBox())
     const handleResize = () => setFitBox(measureFitBox())
     window.addEventListener("resize", handleResize)
@@ -106,72 +119,81 @@ export function WallpaperGalleryDesktop({
 
   useEffect(() => {
     if (currentIndex >= images.length && images.length > 0) {
-      setCurrentIndex(images.length - 1)
+      const nextIndex = images.length - 1
+      currentIndexRef.current = nextIndex
+      setCurrentIndex(nextIndex)
     } else if (images.length === 0) {
       onClose()
     }
   }, [images.length, currentIndex, onClose])
 
+  const navigateToImage = useCallback((nextIndex: number, direction: -1 | 1, withSound: boolean) => {
+    if (nextIndex === currentIndexRef.current) return
+    if (withSound) playDigitalClick("strong")
+
+    currentIndexRef.current = nextIndex
+    setCurrentIndex(nextIndex)
+    if (prefersReducedMotion) return
+
+    requestAnimationFrame(() => {
+      const viewer = viewerRef.current
+      if (!viewer) return
+      viewerAnimationRef.current?.cancel()
+      viewerAnimationRef.current = viewer.animate(
+        [
+          { opacity: 0.72, transform: `translateY(${direction * 18}px)` },
+          { opacity: 1, transform: "translateY(0)" },
+        ],
+        { duration: 140, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
+      )
+    })
+  }, [prefersReducedMotion])
+
+  const handleSelectImage = (nextIndex: number) => {
+    const direction = nextIndex < currentIndexRef.current ? 1 : -1
+    navigateToImage(nextIndex, direction, true)
+  }
+
   useEffect(() => {
-    if (!isNavigatingRef.current) {
-      setImageVisible(true)
-      setSlideX(0)
-      setSlideTransition(true)
+    const handleWheel = (event: WheelEvent) => {
+      // Listening on window means the gallery responds immediately wherever the
+      // pointer happens to be; clicking or focusing the artwork is never part of
+      // the interaction. Horizontal trackpad gestures and pinch zoom stay free.
+      if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+      event.preventDefault()
+
+      const now = performance.now()
+      if (now - lastWheelEventRef.current > WHEEL_IDLE_RESET_MS) wheelDeltaRef.current = 0
+      lastWheelEventRef.current = now
+      const delta = normalizedWheelDelta(event)
+      if (wheelDeltaRef.current !== 0 && Math.sign(delta) !== Math.sign(wheelDeltaRef.current)) {
+        wheelDeltaRef.current = 0
+      }
+      wheelDeltaRef.current += delta
+
+      if (Math.abs(wheelDeltaRef.current) < WHEEL_NAVIGATION_THRESHOLD) return
+      if (now - lastWheelStepRef.current < WHEEL_STEP_INTERVAL_MS) return
+
+      const direction = wheelDeltaRef.current > 0 ? 1 : -1
+      const nextIndex = Math.max(
+        0,
+        Math.min(currentIndexRef.current - direction, images.length - 1),
+      )
+      wheelDeltaRef.current = 0
+      if (nextIndex === currentIndexRef.current) return
+
+      lastWheelStepRef.current = now
+      navigateToImage(nextIndex, direction, false)
     }
-  }, [currentIndex])
+
+    window.addEventListener("wheel", handleWheel, { passive: false, capture: true })
+    return () => window.removeEventListener("wheel", handleWheel, { capture: true })
+  }, [images.length, navigateToImage])
+
+  useEffect(() => () => viewerAnimationRef.current?.cancel(), [])
 
   const currentImage = images[currentIndex]
   if (!currentImage) return null
-
-  const handlePrevious = () => {
-    playDigitalClick("strong")
-    if (prefersReducedMotion) {
-      setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1))
-      return
-    }
-    isNavigatingRef.current = true
-    setSlideTransition(true)
-    setSlideX(30)
-    setImageVisible(false)
-    setTimeout(() => {
-      flushSync(() => {
-        setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1))
-        setSlideTransition(false)
-        setSlideX(-30)
-      })
-      setTimeout(() => {
-        setSlideTransition(true)
-        setSlideX(0)
-        setImageVisible(true)
-        setTimeout(() => { isNavigatingRef.current = false }, 250)
-      }, 16)
-    }, 150)
-  }
-
-  const handleNext = () => {
-    playDigitalClick("strong")
-    if (prefersReducedMotion) {
-      setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0))
-      return
-    }
-    isNavigatingRef.current = true
-    setSlideTransition(true)
-    setSlideX(-30)
-    setImageVisible(false)
-    setTimeout(() => {
-      flushSync(() => {
-        setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0))
-        setSlideTransition(false)
-        setSlideX(30)
-      })
-      setTimeout(() => {
-        setSlideTransition(true)
-        setSlideX(0)
-        setImageVisible(true)
-        setTimeout(() => { isNavigatingRef.current = false }, 250)
-      }, 16)
-    }, 150)
-  }
 
   /**
    * The download, on the press.
@@ -231,7 +253,9 @@ export function WallpaperGalleryDesktop({
     // Above the motion check, because which capture fills the slot is not a
     // motion decision. Reduced motion takes the same step; it just arrives
     // already there.
-    setCurrentIndex(stepsBack ? currentIndex - 1 : 0)
+    const nextIndex = stepsBack ? currentIndex - 1 : 0
+    currentIndexRef.current = nextIndex
+    setCurrentIndex(nextIndex)
     if (prefersReducedMotion) return
     beginSlideIn(stepsBack ? -1 : 1)
   }
@@ -295,10 +319,10 @@ export function WallpaperGalleryDesktop({
           onClick={handleClose}
         >
           {currentImage && (
-            // The prev/next slide rides on this wrapper, not on the image
-            // itself. The image is a projection node now, so Framer owns its
-            // transform for the length of the morph; a second transform on the
-            // same element would be overwritten mid-flight and fight the spring.
+            // Scroll feedback rides on this wrapper, not on the image itself.
+            // The image is a projection node now, so Framer owns its transform
+            // for the length of the morph; a second transform on the same
+            // element would be overwritten mid-flight and fight the spring.
             //
             // A delete's arrival rides here too, and simply takes the wrapper
             // over while it lasts — the two can never overlap, because a step
@@ -307,20 +331,9 @@ export function WallpaperGalleryDesktop({
             // opacity throughout: the arriving capture is not crossfading with
             // anything, it is walking in front of a backdrop.
             <div
+              ref={viewerRef}
               className="absolute inset-0"
-              style={
-                prefersReducedMotion
-                  ? { opacity: imageVisible ? 1 : 0, transition: "opacity 150ms ease-in-out" }
-                  : slideStyle
-                    ? { opacity: 1, ...slideStyle }
-                    : {
-                        opacity: imageVisible ? 1 : 0,
-                        transform: `translateX(${slideX}px)`,
-                        transition: slideTransition
-                          ? "transform 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 180ms ease-out"
-                          : "none",
-                      }
-              }
+              style={slideStyle}
             >
               {/* Two nested layoutIds, and the pair is the whole trick. The card
                   is the aperture: it travels from the thumbnail's rounded square
@@ -330,11 +343,11 @@ export function WallpaperGalleryDesktop({
                   the card everywhere except at the very end, and the card clips
                   it. The capture fills the aperture the entire way across; what
                   changes is how much of it you are allowed to see. */}
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-y-0 left-0 right-28 flex items-center justify-center">
                 {/* layoutDependency pins the layout animation to the open and the
                     close and nothing else. Framer animates a projection node
                     whenever its box changes, and the box now changes on every
-                    arrow press that steps to a differently-shaped capture — which
+                    scroll to a differently-shaped capture — which
                     would set the frame growing across the screen behind a picture
                     that is mid-crossfade. Held constant for the gallery's life, an
                     ordinary re-render is measured but not animated, while the
@@ -379,6 +392,17 @@ export function WallpaperGalleryDesktop({
         }
       >
         {images.length > 0 && (
+          <div className="absolute bottom-20 right-0 top-20">
+            <GalleryThumbnailStrip
+              images={images}
+              currentIndex={currentIndex}
+              onSelect={handleSelectImage}
+              orientation="vertical"
+            />
+          </div>
+        )}
+
+        {images.length > 0 && (
           <Button
             onClick={(e) => { e.stopPropagation(); handleClose() }}
             variant="ghost"
@@ -392,34 +416,6 @@ export function WallpaperGalleryDesktop({
 
         {currentImage && (
           <>
-            {images.length > 1 && (
-              <>
-                {currentIndex > 0 && (
-                  <Button
-                    onClick={(e) => { e.stopPropagation(); handlePrevious() }}
-                    variant="ghost"
-                    size="icon"
-                    className={cn("absolute left-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
-                    aria-label="Previous image"
-                  >
-                    <ChevronLeft className="size-4" strokeWidth={1.7} />
-                  </Button>
-                )}
-
-                {currentIndex < images.length - 1 && (
-                  <Button
-                    onClick={(e) => { e.stopPropagation(); handleNext() }}
-                    variant="ghost"
-                    size="icon"
-                    className={cn("absolute right-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
-                    aria-label="Next image"
-                  >
-                    <ChevronRight className="size-4" strokeWidth={1.7} />
-                  </Button>
-                )}
-              </>
-            )}
-
             {images.length > 0 && (
               <div className="absolute top-4 left-4 flex gap-2">
                 <Button
