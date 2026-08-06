@@ -54,8 +54,6 @@ export function WallpaperGalleryDesktop({
   const wheelDeltaRef = useRef(0)
   const lastWheelEventRef = useRef(0)
   const lastWheelStepRef = useRef(0)
-  const viewerRef = useRef<HTMLDivElement>(null)
-  const viewerAnimationRef = useRef<Animation | null>(null)
   const { slideStyle, beginSlideIn } = useCaptureSlideIn()
   // The capture as it is actually painted, for a close that has to draw its own
   // collapse. See handleClose.
@@ -127,31 +125,16 @@ export function WallpaperGalleryDesktop({
     }
   }, [images.length, currentIndex, onClose])
 
-  const navigateToImage = useCallback((nextIndex: number, direction: -1 | 1, withSound: boolean) => {
+  const navigateToImage = useCallback((nextIndex: number, withSound: boolean) => {
     if (nextIndex === currentIndexRef.current) return
     if (withSound) playDigitalClick("strong")
 
     currentIndexRef.current = nextIndex
     setCurrentIndex(nextIndex)
-    if (prefersReducedMotion) return
-
-    requestAnimationFrame(() => {
-      const viewer = viewerRef.current
-      if (!viewer) return
-      viewerAnimationRef.current?.cancel()
-      viewerAnimationRef.current = viewer.animate(
-        [
-          { opacity: 0.72, transform: `translateY(${direction * 18}px)` },
-          { opacity: 1, transform: "translateY(0)" },
-        ],
-        { duration: 140, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
-      )
-    })
-  }, [prefersReducedMotion])
+  }, [])
 
   const handleSelectImage = (nextIndex: number) => {
-    const direction = nextIndex < currentIndexRef.current ? 1 : -1
-    navigateToImage(nextIndex, direction, true)
+    navigateToImage(nextIndex, true)
   }
 
   useEffect(() => {
@@ -183,14 +166,12 @@ export function WallpaperGalleryDesktop({
       if (nextIndex === currentIndexRef.current) return
 
       lastWheelStepRef.current = now
-      navigateToImage(nextIndex, direction, false)
+      navigateToImage(nextIndex, false)
     }
 
     window.addEventListener("wheel", handleWheel, { passive: false, capture: true })
     return () => window.removeEventListener("wheel", handleWheel, { capture: true })
   }, [images.length, navigateToImage])
-
-  useEffect(() => () => viewerAnimationRef.current?.cancel(), [])
 
   const currentImage = images[currentIndex]
   if (!currentImage) return null
@@ -319,19 +300,11 @@ export function WallpaperGalleryDesktop({
           onClick={handleClose}
         >
           {currentImage && (
-            // Scroll feedback rides on this wrapper, not on the image itself.
-            // The image is a projection node now, so Framer owns its transform
-            // for the length of the morph; a second transform on the same
+            // A delete's arrival rides on this wrapper instead of the image.
+            // The image is a projection node, so Framer owns its transform for
+            // the length of the gallery morph; a second transform on the same
             // element would be overwritten mid-flight and fight the spring.
-            //
-            // A delete's arrival rides here too, and simply takes the wrapper
-            // over while it lasts — the two can never overlap, because a step
-            // through the strip and a step caused by a deletion are both a change
-            // of index and there is only one of those at a time. Kept at full
-            // opacity throughout: the arriving capture is not crossfading with
-            // anything, it is walking in front of a backdrop.
             <div
-              ref={viewerRef}
               className="absolute inset-0"
               style={slideStyle}
             >
