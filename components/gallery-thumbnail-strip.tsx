@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react"
 import {
   animate,
   motion,
@@ -40,6 +40,31 @@ const DESKTOP_SPREAD = 2.5
 const DESKTOP_FALLBACK_HEIGHT = 56
 const DESKTOP_FALLBACK_GAP = 8
 
+/**
+ * The selection ring travelling — *and* the rail scrolling to meet it.
+ *
+ * The two share this curve, and sharing it is the whole reason the ring holds
+ * still. Step through the middle of a long stack and the ring moves one pitch
+ * down the content while the rail scrolls one pitch up underneath, so its
+ * position on screen is
+ *
+ *     centre + pitch × (ring progress − scroll progress)
+ *
+ * — zero for every frame of the step, but only while those two progresses are
+ * the same function of time. They were not: this drove the ring, and the rail
+ * used `scrollTo({ behavior: "smooth" })`, which is the browser's own curve of
+ * its own length. The difference is a visible excursion, the ring bulging off
+ * centre and crawling back, and at a 100ms wheel-step interval against a 280ms
+ * spring the steps overlap and it compounds.
+ *
+ * So: one object, two readers, and they must not drift apart. Give the scroll
+ * its own tier and the artefact comes straight back.
+ *
+ * Nothing here pins the ring at the ends of the stack, and nothing should. The
+ * scroll target is clamped there, so the rail travels less than a pitch and the
+ * ring takes up exactly the shortfall — which is the arithmetic above still
+ * holding, not an exception to it.
+ */
 const SELECTION_SPRING = { type: "spring", duration: 0.28, bounce: 0 } as const
 /** The mobile strip's press. Unchanged from what it was. */
 const PRESS_SPRING = { type: "spring", duration: 0.22, bounce: 0 } as const
@@ -149,6 +174,41 @@ export function GalleryThumbnailStrip({
   )
 
   useEffect(() => () => strengthAnimation.current?.stop(), [])
+
+  /**
+   * The rail's own scroll offset, as a motion value.
+   *
+   * The same shape as `strength` above, for the same reason: a spring that has
+   * to survive being re-aimed mid-flight. Wheel steps arrive every 100ms and the
+   * spring runs for 280, so re-targeting is the normal case rather than the edge
+   * one — and re-targeting a live `MotionValue` is what carries the velocity
+   * across, which is the only way this stays in step with the ring's layout
+   * animation, since Framer re-aims that one the same way.
+   */
+  const scrollOffset = useMotionValue(0)
+  const scrollAnimation = useRef<AnimationPlaybackControls | null>(null)
+
+  const scrollAxis = isVertical ? ("scrollTop" as const) : ("scrollLeft" as const)
+
+  useMotionValueEvent(scrollOffset, "change", (value) => {
+    const scroller = scrollRef.current
+    if (!scroller) return
+    scroller[scrollAxis] = value
+  })
+
+  /**
+   * Hand the rail back to the browser.
+   *
+   * Native smooth scroll cancels itself the moment you touch the wheel; ours
+   * will happily keep writing `scrollTop` over the top of you, so the release
+   * has to be explicit.
+   */
+  const stopScroll = useCallback(() => {
+    scrollAnimation.current?.stop()
+    scrollAnimation.current = null
+  }, [])
+
+  useEffect(() => () => scrollAnimation.current?.stop(), [])
 
   const registerNode = useCallback((displayIndex: number, node: HTMLButtonElement | null) => {
     itemRefs.current[displayIndex] = node
@@ -340,7 +400,7 @@ export function GalleryThumbnailStrip({
     const nav = scrollRef.current
     if (!nav || !isVertical || prefersReducedMotion) return
 
-    // Selecting a frame smooth-scrolls the rail, which moves the frames past a
+    // Selecting a frame scrolls the rail, which moves the frames past a
     // stationary cursor. That is a real change in proximity, so the field should
     // follow it rather than be suppressed — recompute from the last cursor
     // position on every scroll frame.
@@ -374,6 +434,31 @@ export function GalleryThumbnailStrip({
   }, [applyField, isVertical, measure, prefersReducedMotion, trackPointer])
 
   /**
+   * A hand on the rail outranks the centring.
+   *
+   * Wheel input over the rail belongs to its native scroller and deliberately
+   * does not change the selected capture — the gallery's own wheel handler bows
+   * out for this element. The centring spring has to bow out too, and unlike
+   * the `scrollTo` it replaced it will not do so by itself: a browser cancels
+   * its smooth scroll on user input, whereas ours would go on writing
+   * `scrollTop` underneath a reader who is scrolling somewhere else.
+   *
+   * Both orientations, since the horizontal strip is dragged rather than
+   * wheeled and `touchstart` is where that begins.
+   */
+  useEffect(() => {
+    const nav = scrollRef.current
+    if (!nav || prefersReducedMotion) return
+
+    nav.addEventListener("wheel", stopScroll, { passive: true })
+    nav.addEventListener("touchstart", stopScroll, { passive: true })
+    return () => {
+      nav.removeEventListener("wheel", stopScroll)
+      nav.removeEventListener("touchstart", stopScroll)
+    }
+  }, [prefersReducedMotion, stopScroll])
+
+  /**
    * Keep the current frame centred — unless you pointed at it.
    *
    * The rail has to follow a selection it did not cause: step with the wheel or
@@ -387,7 +472,13 @@ export function GalleryThumbnailStrip({
    * a press that never became a selection — press, drag off the frame, release —
    * is discarded by the next index change instead of suppressing it.
    */
-  useEffect(() => {
+  // useLayoutEffect, not useEffect, and the phase is the point. Framer starts
+  // the ring's projection animation in the layout phase; starting the scroll a
+  // frame later leaves the two offset by 16ms at the head of the spring, which
+  // is exactly where its slope is steepest and so exactly where the offset
+  // shows. It is also the right phase on its own terms — everything read below
+  // is layout.
+  useLayoutEffect(() => {
     const pointerSelected = pointerSelectRef.current
     pointerSelectRef.current = null
 
@@ -405,16 +496,31 @@ export function GalleryThumbnailStrip({
       orientation === "vertical"
         ? scroller.scrollHeight - scroller.clientHeight
         : scroller.scrollWidth - scroller.clientWidth
+    const target = Math.max(0, Math.min(itemCenter - viewportSize / 2, maxScroll))
 
-    scroller.scrollTo({
-      [orientation === "vertical" ? "top" : "left"]: Math.max(
-        0,
-        Math.min(itemCenter - viewportSize / 2, maxScroll),
-      ),
-      behavior: prefersReducedMotion ? "instant" : "smooth",
+    if (prefersReducedMotion) {
+      stopScroll()
+      scroller[scrollAxis] = target
+      return
+    }
+
+    // Re-read the DOM only from rest. `jump` clears velocity, which is the
+    // right thing when the rail has been sitting still or the reader dragged it
+    // somewhere themselves, and precisely the wrong thing mid-step: doing it on
+    // every wheel tick would zero the velocity 100ms into a 280ms spring and
+    // hand the ring back the drift this whole arrangement removes.
+    if (!scrollAnimation.current) scrollOffset.jump(scroller[scrollAxis])
+
+    const controls = animate(scrollOffset, target, SELECTION_SPRING)
+    scrollAnimation.current = controls
+    // Guarded, because a re-aim leaves this promise behind: the identity check
+    // is what stops a superseded animation from clearing its successor's slot
+    // and inviting the `jump` above back in.
+    controls.then(() => {
+      if (scrollAnimation.current === controls) scrollAnimation.current = null
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, images.length, orientation, prefersReducedMotion])
+  }, [currentIndex, images.length, orientation, prefersReducedMotion, scrollAxis, stopScroll])
 
   return (
     <nav
