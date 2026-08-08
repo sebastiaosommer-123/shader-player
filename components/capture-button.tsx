@@ -30,10 +30,30 @@ export function CaptureButton({ onCapture }: CaptureButtonProps) {
       // The press scales the fill, not the button: on a real camera the ring is
       // part of the body and only the button travels. Scaling both would read
       // as the whole shutter assembly shrinking into the bar.
-      className="group flex size-12 rounded-full border-[2.5px] border-shutter-ink bg-transparent p-[1.5px] shadow-none hoverFine:bg-transparent cursor-pointer"
+      //
+      // Hover pulls the ink back to 90%, ring and fill together — the same /90
+      // the Button variants already use for a solid control, so the shutter
+      // answers the pointer the way every other filled control in here does.
+      // Moving both keeps them reading as one shutter rather than a disc
+      // dimming inside a ring that didn't.
+      //
+      // One token, both themes, and it lands the right way round in each: the
+      // palette is achromatic, so 90% of the ink is 10% of the surface behind
+      // it. Light mode's dark shutter lifts toward the bar; dark mode's near
+      // white one settles into it. No new hue, because there isn't one in the
+      // design to be coherent with.
+      //
+      // hoverFine, not hover: a touch device would otherwise latch the state on
+      // after a tap and hold it there through the capture.
+      className="group flex size-12 rounded-full border-[2.5px] border-shutter-ink hoverFine:border-shutter-ink/90 bg-transparent p-[1.5px] shadow-none hoverFine:bg-transparent cursor-pointer transition-colors duration-150 ease-out"
       aria-label="Capture frame"
     >
-      <span className="size-10 rounded-full bg-shutter-ink transition-transform duration-100 ease-out group-active:scale-90 motion-reduce:transition-none" />
+      {/* Two timings on one element, which is why this is written out rather
+          than left to `transition-transform`: the press is 100ms because a
+          shutter should feel immediate, and the hover is 150ms to match the
+          other hover fades in the chrome. A single duration would have to be
+          wrong for one of them. */}
+      <span className="size-10 rounded-full bg-shutter-ink group-hoverFine:bg-shutter-ink/90 [transition:transform_100ms_ease-out,background-color_150ms_ease-out] group-active:scale-90 motion-reduce:transition-none" />
     </Button>
   )
 }
