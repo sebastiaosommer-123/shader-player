@@ -63,7 +63,20 @@ export function FloatingToolbar({
       data-floating-toolbar
       offset={2}
       shadowLevel={3}
-      className="hidden md:flex fixed bottom-6 left-1/2 -translate-x-1/2 z-10 items-center gap-2 rounded-full p-1.5"
+      // Centred on the canvas, not on the window. The canvas is `flex-1` beside
+      // a sidebar of `var(--sidebar-width)`, so its own centre is half of what
+      // the sidebar leaves — and `left-1/2` was putting the bar half the sidebar
+      // width to the right of it, which reads as off-centre against the artwork
+      // the bar is sitting on. The wider the sidebar is dragged, the further out
+      // it drifted.
+      //
+      // The same 280px fallback the sidebar itself declares, since the real
+      // width is only on the document element after the boot script runs.
+      //
+      // Nothing transitions `left`, deliberately: the variable updates on every
+      // frame of a sidebar drag, and the bar should track the canvas edge
+      // exactly rather than easing after it.
+      className="hidden md:flex fixed bottom-6 left-1/2 md:left-[calc((100vw_-_var(--sidebar-width,280px))/2)] -translate-x-1/2 z-10 items-center gap-2 rounded-full p-1.5"
     >
       {/* The slot, mounted whether or not there is anything in it — an element
           that isn't there can't animate its way in, and this has to collapse
