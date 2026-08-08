@@ -41,6 +41,47 @@ const DESKTOP_FALLBACK_HEIGHT = 56
 const DESKTOP_FALLBACK_GAP = 8
 
 /**
+ * The mobile frame: 41×52, which is a 33×44 picture at 3:4.
+ *
+ * Upright, uniform, and cropped — each of those a separate decision.
+ *
+ * *Upright*, because the 92-wide landscape box this replaced showed 40% of a
+ * phone-shaped capture. `object-cover` scales to fill the width, so a portrait
+ * wallpaper in a 1.44 box loses its top and bottom — most of what makes it
+ * recognisable as that capture — at the one size where there is least to go on.
+ * At 3:4 the frame keeps 77%.
+ *
+ * *Uniform*, and not the capture's own aspect, which is what this was for about
+ * an hour. Every capture here is the canvas, and the canvas is the screen, so
+ * sizing each frame to its source produces no variety at all: just a rank of
+ * identical 40px slivers, a barcode rather than a filmstrip. Aspect fidelity is
+ * the one-up view's job — it is showing the whole capture, full bleed, directly
+ * above this. The rail is a scrubber, and an even pitch is what makes it
+ * scannable. It is also what iOS does everywhere: the Photos grid is square and
+ * centre-cropped whatever the shot, and its one-up filmstrip is uniform tiles
+ * with the current one *marked*, not resized.
+ *
+ * *Cropped* at 3:4 rather than square — the iOS convention tilted portrait,
+ * since every capture here is. Square would read as a photo library; this reads
+ * as a stack of wallpapers, which is what they are.
+ *
+ * 41 wide rather than the 39 a 3:4 *frame* would be: the 2px button border and
+ * the 2px of selection-ring padding take 4px off each edge, and it is the
+ * picture that has to be 3:4, since the picture is the part anyone looks at.
+ *
+ * That lands the frame at 52 tall and 41 wide — over the 44px minimum touch
+ * target on one axis and 3px under it on the other, which is as close as a 3:4
+ * box gets without the picture driving the width somewhere it should not go.
+ * The shortfall is also bounded by the rail being a convenience rather than the
+ * only way through the stack: the gallery pages with a swipe across the
+ * full-screen image, which is a target the size of the screen.
+ *
+ * The desktop rail keeps its own 80×56: that pitch is what the magnification
+ * field's fit and geometry are reckoned off.
+ */
+const MOBILE_FRAME_CLASS = "h-[52px] w-[41px]"
+
+/**
  * The selection ring travelling — *and* the rail scrolling to meet it.
  *
  * The two share this curve, and sharing it is the whole reason the ring holds
@@ -534,7 +575,21 @@ export function GalleryThumbnailStrip({
           // measured centres and the mapped cursor share one coordinate space
           // whatever the gallery wraps this in.
           ? "relative h-full w-32 overflow-x-hidden overflow-y-auto"
-          : "w-full overflow-x-auto overflow-y-hidden px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2",
+          // Equal padding top and bottom, and the bottom one is the half that
+          // does the work: this bar is pinned to `bottom-0`, so its height grows
+          // upward and only `pb` can move the frames. `pt` matches it so the
+          // bar's own box is symmetric — which is what makes it sit centred in
+          // the letterbox below the capture, rather than merely ending there.
+          //
+          // 14px, because the capture above is `max-h-full` and centred, so the
+          // band between its bottom edge and the screen's is 80px on a phone —
+          // 14 + the 52px frame + 14. The old 8/12 split put 16 above the frame
+          // and 12 below it, which is the bottom-heavy sit you can see once you
+          // look for it.
+          //
+          // The safe-area floor still wins on a home-indicator device, and
+          // should: clearing the indicator outranks centring against it.
+          : "w-full overflow-x-auto overflow-y-hidden px-3 pb-[max(0.875rem,env(safe-area-inset-bottom))] pt-3.5",
       )}
       onClick={(event) => event.stopPropagation()}
       onPointerMove={isVertical && !prefersReducedMotion ? handlePointerMove : undefined}
@@ -668,7 +723,7 @@ function GalleryThumbnailFrame({
         "border-transparent",
         isVertical
           ? "h-14 w-20 origin-right rounded-[10px] p-1"
-          : "h-16 w-[5.75rem] rounded-[5px] p-0.5",
+          : `${MOBILE_FRAME_CLASS} rounded-[5px] p-0.5`,
       )}
       style={isVertical ? { scale, y } : undefined}
       // The press affordance stays on the horizontal strip's `scale` only

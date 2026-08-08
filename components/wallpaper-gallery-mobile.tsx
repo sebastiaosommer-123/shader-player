@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react"
 import { motion, useIsPresent, useReducedMotion } from "framer-motion"
-import { X, ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react"
+import { X, Download, Trash2 } from "lucide-react"
 import { BlossomCarousel, type BlossomCarouselHandle } from "@blossom-carousel/react"
 import { Button } from "@/components/ui/button"
 import type { CapturedImage } from "@/lib/types"
@@ -194,19 +194,6 @@ export function WallpaperGalleryMobile({
 
   const currentImage = images[currentIndex]
   if (!currentImage) return null
-
-  const canPrevious = currentIndex > 0
-  const canNext = currentIndex < imageCount - 1
-
-  const handlePrevious = () => {
-    playDigitalClick("strong")
-    scrollToIndex(Math.max(currentIndex - 1, 0), !prefersReducedMotion)
-  }
-
-  const handleNext = () => {
-    playDigitalClick("strong")
-    scrollToIndex(Math.min(currentIndex + 1, imageCount - 1), !prefersReducedMotion)
-  }
 
   const handleSelectImage = (index: number) => {
     if (index === currentIndex) return
@@ -505,38 +492,12 @@ export function WallpaperGalleryMobile({
 
         {currentImage && (
           <>
-            {/* Kept mounted and faded at the ends rather than swapped in and
-                out. The index they read from now moves with the scroll, and a
-                button that pops into existence halfway through a swipe reads as
-                a glitch rather than as an affordance arriving. */}
-            {imageCount > 1 && (
-              <>
-                <Button
-                  onClick={(e) => { e.stopPropagation(); handlePrevious() }}
-                  variant="ghost"
-                  size="icon"
-                  disabled={!canPrevious}
-                  style={{ opacity: canPrevious ? 1 : 0 }}
-                  className={cn("absolute left-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
-                  aria-label="Previous image"
-                >
-                  <ChevronLeft className="size-4" strokeWidth={1.7} />
-                </Button>
-
-                <Button
-                  onClick={(e) => { e.stopPropagation(); handleNext() }}
-                  variant="ghost"
-                  size="icon"
-                  disabled={!canNext}
-                  style={{ opacity: canNext ? 1 : 0 }}
-                  className={cn("absolute right-4 top-1/2 -translate-y-1/2 size-11 dark:border-border/20 md:dark:border-border", galleryButtonClass)}
-                  aria-label="Next image"
-                >
-                  <ChevronRight className="size-4" strokeWidth={1.7} />
-                </Button>
-              </>
-            )}
-
+            {/* No prev/next arrows here, deliberately. Paging is the swipe — the
+                carousel is a real scroll container, so the finger is already the
+                primary control and the thumbnail rail below is the direct one.
+                A pair of chevrons pinned over the middle of the capture only
+                covered the thing being looked at. Desktop has none either; it
+                pages with the wheel, the arrow keys and its own rail. */}
             {imageCount > 0 && (
               <div className="absolute top-4 left-4 flex gap-2">
                 <Button
