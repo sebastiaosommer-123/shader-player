@@ -397,6 +397,14 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
     // --- Motion values ---
     const motionX0 = useMotionValue(0);
     const motionX1 = useMotionValue(0);
+    const visualThumbTransform0 = useTransform(
+      motionX0,
+      (x) => `translateX(${x}px)`
+    );
+    const visualThumbTransform1 = useTransform(
+      motionX1,
+      (x) => `translateX(${x}px)`
+    );
 
     // --- Derived motion values for fill ---
     const fillLeft = useTransform(motionX0, (x) =>
@@ -775,7 +783,8 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
 
     // --- Render visual thumb (not Radix — purely visual) ---
     const renderVisualThumb = (index: number) => {
-      const motionX = index === 0 ? motionX0 : motionX1;
+      const visualThumbTransform =
+        index === 0 ? visualThumbTransform0 : visualThumbTransform1;
       return (
         <motion.span
           key={`visual-thumb-${index}`}
@@ -784,7 +793,8 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
             width: THUMB_SIZE,
             height: THUMB_SIZE,
             marginTop: -THUMB_SIZE / 2,
-            x: motionX,
+            transform: visualThumbTransform,
+            willChange: "transform",
             position: "absolute",
             top: "50%",
             left: 0,
@@ -1122,6 +1132,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const dragging = useRef(false);
     const handleDragging = useRef(false);
+    const pendingKeyboardValueRef = useRef<number | null>(null);
     const [isHovered, setIsHovered] = useState(false);
     const [isPressed, setIsPressed] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
@@ -1189,14 +1200,19 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
     const zeroTarget = variant === "pips" ? 8 : 17;
     const zeroOffset = useMotionValue(value === min ? zeroTarget : 0);
 
-    const fillWidthStyle = useTransform(fillPercent, (p) => `${p * 100}%`);
-    const handleLeftStyle = useTransform(
-      [fillPercent, zeroOffset] as MotionValue<number>[],
-      ([p, zo]) => `calc(${(p as number) * 100}% - 8px + ${zo as number}px)`
+    const scrubberFillTransformStyle = useTransform(
+      fillPercent,
+      (p) => `scaleX(${p})`
     );
-    const handleLineLeftStyle = useTransform(
+    const scrubberHandleLineTransformStyle = useTransform(
       [fillPercent, zeroOffset] as MotionValue<number>[],
-      ([p, zo]) => `calc(${(p as number) * 100}% - 9px + ${zo as number}px)`
+      ([p, zo]) =>
+        `translateX(calc(${(p as number) * 100}% - 9px + ${zo as number}px))`
+    );
+    const scrubberResizeHandleTransformStyle = useTransform(
+      [fillPercent, zeroOffset] as MotionValue<number>[],
+      ([p, zo]) =>
+        `translateX(calc(${(p as number) * 100}% - 8px + ${zo as number}px))`
     );
     // Pips-specific: offset by px-3 (12px) padding so fill edge aligns with active pip center
     const pipsFillWidthStyle = useTransform(
@@ -1268,9 +1284,27 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
     // Sync fill on programmatic value change
     useEffect(() => {
       if (dragging.current || handleDragging.current) return;
-      const percent = max === min ? 0 : Math.max(0, Math.min(1, (value - min) / (max - min)));
+
+      const percent = max === min
+        ? 0
+        : Math.max(0, Math.min(1, (value - min) / (max - min)));
+      const nextZeroOffset = value === min ? zeroTarget : 0;
+      const isKeyboardSync =
+        pendingKeyboardValueRef.current !== null &&
+        Object.is(pendingKeyboardValueRef.current, value);
+
+      pendingKeyboardValueRef.current = null;
+
+      if (isKeyboardSync) {
+        fillPercent.stop();
+        zeroOffset.stop();
+        fillPercent.set(percent);
+        zeroOffset.set(nextZeroOffset);
+        return;
+      }
+
       animate(fillPercent, percent, spring.fast);
-      animate(zeroOffset, value === min ? zeroTarget : 0, spring.fast);
+      animate(zeroOffset, nextZeroOffset, spring.fast);
     }, [value, min, max, variant, fillPercent, zeroOffset, zeroTarget]);
 
     const getValueFromX = useCallback(
@@ -1371,7 +1405,9 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
 
     const handleRadixChange = useCallback(
       (newValues: number[]) => {
-        onChange(newValues[0]);
+        const nextValue = newValues[0];
+        pendingKeyboardValueRef.current = nextValue;
+        onChange(nextValue);
       },
       [onChange]
     );
@@ -1622,9 +1658,11 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         {/* Scrubber: fill */}
         {variant === "scrubber" && (
           <motion.div
-            className="absolute left-0 top-0 bottom-0 pointer-events-none"
+            className="absolute inset-0 pointer-events-none"
             style={{
-              width: fillWidthStyle,
+              transform: scrubberFillTransformStyle,
+              transformOrigin: "left center",
+              willChange: "transform",
               backgroundColor: "var(--active)",
             }}
           />
@@ -1633,23 +1671,28 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         {/* Scrubber: handle line */}
         {variant === "scrubber" && (
           <motion.div
-            className="absolute rounded-full pointer-events-none z-10"
-            initial={false}
-            animate={{
-              top: isActive ? 7 : 8,
-              bottom: isActive ? 7 : 8,
-              backgroundColor: isFocused
-                ? "var(--foreground)"
-                : isHovered
-                ? "color-mix(in srgb, var(--foreground) 65%, transparent)"
-                : "color-mix(in srgb, var(--foreground) 45%, transparent)",
-            }}
-            transition={spring.fast}
+            className="absolute inset-0 pointer-events-none z-10"
             style={{
-              left: handleLineLeftStyle,
-              width: 2,
+              transform: scrubberHandleLineTransformStyle,
+              willChange: "transform",
             }}
-          />
+          >
+            <motion.div
+              className="absolute left-0 rounded-full"
+              initial={false}
+              animate={{
+                top: isActive ? 7 : 8,
+                bottom: isActive ? 7 : 8,
+                backgroundColor: isFocused
+                  ? "var(--foreground)"
+                  : isHovered
+                  ? "color-mix(in srgb, var(--foreground) 65%, transparent)"
+                  : "color-mix(in srgb, var(--foreground) 45%, transparent)",
+              }}
+              transition={spring.fast}
+              style={{ width: 2 }}
+            />
+          </motion.div>
         )}
 
         {/* Scrubber: label */}
@@ -1683,13 +1726,20 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         {/* Resize handle (scrubber only) */}
         {variant === "scrubber" && (
           <motion.div
-            className="absolute top-0 bottom-0 w-2 cursor-ew-resize z-20"
-            style={{ left: handleLeftStyle }}
-            onPointerDown={handleResizePointerDown}
-            onPointerMove={handleResizePointerMove}
-            onPointerUp={handleResizePointerUp}
-            onPointerCancel={handleResizePointerUp}
-          />
+            className="absolute inset-0 pointer-events-none z-20"
+            style={{
+              transform: scrubberResizeHandleTransformStyle,
+              willChange: "transform",
+            }}
+          >
+            <div
+              className="absolute left-0 top-0 bottom-0 w-2 pointer-events-auto cursor-ew-resize"
+              onPointerDown={handleResizePointerDown}
+              onPointerMove={handleResizePointerMove}
+              onPointerUp={handleResizePointerUp}
+              onPointerCancel={handleResizePointerUp}
+            />
+          </motion.div>
         )}
       </motion.div>
       </div>

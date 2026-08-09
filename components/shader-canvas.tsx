@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react"
+import { useReducedMotion } from "framer-motion"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import { initShader, updateUniforms } from "@/lib/shader-renderer"
 
@@ -15,6 +16,7 @@ export interface ShaderCanvasRef {
 }
 
 export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ params, shaderId, isPaused = false }, ref) => {
+  const prefersReducedMotion = useReducedMotion()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<WebGLRenderingContext | null>(null)
   const programRef = useRef<WebGLProgram | null>(null)
@@ -22,9 +24,11 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
   const paramsRef = useRef<ShaderParams>(params)
   const shaderIdRef = useRef<string>(shaderId)
   const isPausedRef = useRef(isPaused)
+  const reducedMotionRef = useRef(Boolean(prefersReducedMotion))
   const pausedAtRef = useRef<number | null>(null)
   const totalPausedTimeRef = useRef(0)
   const renderFnRef = useRef<(() => void) | null>(null)
+  const drawFrameRef = useRef<(() => void) | null>(null)
   const isLoopRunningRef = useRef(false)
 
   useImperativeHandle(ref, () => ({
@@ -33,15 +37,23 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
 
   useEffect(() => {
     paramsRef.current = params
+    if (isPausedRef.current || reducedMotionRef.current) {
+      drawFrameRef.current?.()
+    }
   }, [params])
 
   useEffect(() => {
-    const wasPaused = isPausedRef.current
-    isPausedRef.current = isPaused
+    const wasStopped = isPausedRef.current || reducedMotionRef.current
 
-    if (isPaused && !wasPaused) {
+    isPausedRef.current = isPaused
+    reducedMotionRef.current = Boolean(prefersReducedMotion)
+
+    const isStopped = isPausedRef.current || reducedMotionRef.current
+
+    if (isStopped && !wasStopped) {
       pausedAtRef.current = Date.now()
-    } else if (!isPaused && wasPaused) {
+      drawFrameRef.current?.()
+    } else if (!isStopped && wasStopped) {
       if (pausedAtRef.current !== null) {
         totalPausedTimeRef.current += Date.now() - pausedAtRef.current
         pausedAtRef.current = null
@@ -51,7 +63,7 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
         renderFnRef.current()
       }
     }
-  }, [isPaused])
+  }, [isPaused, prefersReducedMotion])
 
   useEffect(() => {
     if (shaderIdRef.current !== shaderId && glRef.current) {
@@ -80,6 +92,8 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
     programRef.current = initShader(gl, shaderId)
 
     const startTime = Date.now()
+    totalPausedTimeRef.current = 0
+    pausedAtRef.current = isPausedRef.current || reducedMotionRef.current ? startTime : null
 
     // Elapsed shader time, frozen at the moment of pausing so a redraw while
     // paused reproduces the same frame rather than jumping forward.
@@ -97,6 +111,7 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
       gl.clear(gl.COLOR_BUFFER_BIT)
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     }
+    drawFrameRef.current = drawFrame
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1
@@ -124,7 +139,7 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
     window.addEventListener("resize", resize)
 
     const render = () => {
-      if (!gl || !programRef.current || isPausedRef.current) {
+      if (!gl || !programRef.current || isPausedRef.current || reducedMotionRef.current) {
         isLoopRunningRef.current = false
         return
       }
@@ -144,6 +159,9 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current)
       }
+      renderFnRef.current = null
+      drawFrameRef.current = null
+      isLoopRunningRef.current = false
     }
   }, [shaderId])
 
