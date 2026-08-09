@@ -175,16 +175,41 @@ export function GalleryThumbnailStrip({
 }: GalleryThumbnailStripProps) {
   const prefersReducedMotion = useReducedMotion()
   const scrollRef = useRef<HTMLElement>(null)
-  const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const valueRefs = useRef<(FrameValues | null)[]>([])
   const selectionTransition = prefersReducedMotion ? { duration: 0 } : SELECTION_SPRING
   const isVertical = orientation === "vertical"
   const displayedImages = isVertical ? [...images].reverse() : images
 
-  // Refs are keyed by *display* index — the rail's own top-to-bottom order,
-  // which is reversed on desktop so the newest capture sits at the top.
+  // Registries are keyed by *display* index — the rail's own top-to-bottom
+  // order, which is reversed on desktop so the newest capture sits at the top.
   const displayIndexOf = (imageIndex: number) =>
     isVertical ? images.length - 1 - imageIndex : imageIndex
+
+  /**
+   * The frames, in display order, read straight out of the DOM.
+   *
+   * This used to be a registry the frames wrote themselves into from a callback
+   * ref, and a delete took it apart. Every frame below the deleted one changes
+   * display index, which changes the identity of its inline ref callback, and
+   * React answers that by running the old cleanup and the new callback — but
+   * interleaved through the tree, not in two clean passes. The cleanup closes
+   * over the old index, so it lands on a slot a neighbour has already claimed.
+   * Guarding the cleanup on identity fixes some of the orderings and not all of
+   * them; the registry came back from a delete holed either way, `measure` then
+   * skipped the missing frames, and the pitch it derived from the survivors was
+   * a multiple of the real one. The field — and the ring, which now reads the
+   * same geometry — were laid out against a strip that did not exist.
+   *
+   * DOM order *is* display order, by construction, and it cannot be stale: there
+   * is no second copy to keep in step. So there is nothing left to corrupt.
+   */
+  const readFrames = useCallback(
+    () =>
+      scrollRef.current
+        ? Array.from(scrollRef.current.querySelectorAll<HTMLButtonElement>("[data-thumbnail-frame]"))
+        : [],
+    [],
+  )
 
   // Item centres in the scroller's content space, plus the frame height and the
   // centre-to-centre pitch, all measured rather than assumed.
@@ -236,6 +261,46 @@ export function GalleryThumbnailStrip({
 
   const scrollAxis = isVertical ? ("scrollTop" as const) : ("scrollLeft" as const)
 
+  /**
+   * Where the selection ring is, as a *fractional frame index*.
+   *
+   * The ring used to be a `layoutId` element living inside the selected frame,
+   * and that is the one thing it cannot be. Framer moves a shared element by
+   * measuring both boxes on screen and rendering the difference as a translate
+   * on the incoming one — then dividing that screen-space distance by
+   * `treeScale` to express it in the element's own coordinate space. `treeScale`
+   * only accumulates ancestors that are themselves running a layout animation,
+   * and these frames are not: their scale is a motion value we write by hand. So
+   * the divisor stayed 1 while the real parent was magnified by up to 1.34, and
+   * the ring travelled 34% too far — visibly shooting *past* the frame it was
+   * leaving, in the opposite direction, before the spring dragged it back. The
+   * `origin-right` below compounded it sideways: the projection assumes an
+   * origin of 50% unless it is handed `originX` as a motion prop.
+   *
+   * There is no tuning out of that. A projected child of an element scaled by
+   * hand is outside what the projection can model at all. So the ring comes out
+   * of the frame and is placed directly, in the rail's own coordinate space, off
+   * the geometry `applyField` has already measured.
+   *
+   * Fractional, and interpolated across the two frames it lies between, rather
+   * than a pixel position sprung straight at a target. At rest that puts it
+   * exactly on a frame; mid-travel it reads the *current* magnified geometry of
+   * both neighbours, so it stays glued to the strip while the strip is still
+   * opening and closing under the cursor. A sprung pixel target would come
+   * unstuck from the frames the moment the mouse moved.
+   *
+   * Same spring as the scroll above, for the reason SELECTION_SPRING gives: this
+   * is the ring's half of `centre + pitch × (ring progress − scroll progress)`.
+   */
+  const selection = useMotionValue(0)
+  const selectionAnimation = useRef<AnimationPlaybackControls | null>(null)
+  /** −1 so the first aim is a jump, not a flight up from frame zero. */
+  const selectionCountRef = useRef(-1)
+  const ringY = useMotionValue(0)
+  const ringScale = useMotionValue(1)
+
+  useEffect(() => () => selectionAnimation.current?.stop(), [])
+
   useMotionValueEvent(scrollOffset, "change", (value) => {
     const scroller = scrollRef.current
     if (!scroller) return
@@ -256,10 +321,6 @@ export function GalleryThumbnailStrip({
 
   useEffect(() => () => scrollAnimation.current?.stop(), [])
 
-  const registerNode = useCallback((displayIndex: number, node: HTMLButtonElement | null) => {
-    itemRefs.current[displayIndex] = node
-  }, [])
-
   const registerValues = useCallback((displayIndex: number, values: FrameValues | null) => {
     valueRefs.current[displayIndex] = values
   }, [])
@@ -269,9 +330,9 @@ export function GalleryThumbnailStrip({
     const centers: number[] = []
     let height = DESKTOP_FALLBACK_HEIGHT
 
-    for (let index = 0; index < itemRefs.current.length; index += 1) {
-      const node = itemRefs.current[index]
-      if (!node) continue
+    const frames = readFrames()
+    for (let index = 0; index < frames.length; index += 1) {
+      const node = frames[index]
       // offsetTop, not getBoundingClientRect: these are layout values, immune to
       // the transforms this component is in the middle of applying.
       centers[index] = node.offsetTop + node.offsetHeight / 2
@@ -284,7 +345,7 @@ export function GalleryThumbnailStrip({
         : height + DESKTOP_FALLBACK_GAP
 
     geometryRef.current = { centers, height, pitch }
-  }, [isVertical])
+  }, [isVertical, readFrames])
 
   /**
    * One pass: scale every frame from its distance to the cursor, then place it.
@@ -337,12 +398,29 @@ export function GalleryThumbnailStrip({
       values.scale.set(scales[index])
       values.y.set(spread[index] - anchor)
     }
-  }, [strength])
+
+    // The ring, out of the same pass and the same numbers: whatever the field is
+    // doing to the two frames it lies between, it is doing to the ring.
+    const ringPosition = Math.min(Math.max(selection.get(), 0), count - 1)
+    const lower = Math.min(Math.floor(ringPosition), Math.max(count - 2, 0))
+    const upper = Math.min(lower + 1, count - 1)
+    const between = ringPosition - lower
+    const lowerCenter = (centers[lower] ?? 0) + spread[lower] - anchor
+    const upperCenter = (centers[upper] ?? 0) + spread[upper] - anchor
+    ringScale.set(scales[lower] + (scales[upper] - scales[lower]) * between)
+    // The ring's box is the frame's own, pinned to the rail's top, so the
+    // translate carries its centre to the frame's centre.
+    ringY.set(lowerCenter + (upperCenter - lowerCenter) * between - height / 2)
+  }, [ringScale, ringY, selection, strength])
 
   // The strength spring is what carries the field in and out; every frame of it
   // needs the whole field recomputed, since the scales it multiplies also drive
   // the displacement.
   useMotionValueEvent(strength, "change", applyField)
+
+  // And the ring's travel needs the same, for the same reason: the frames it is
+  // interpolating between are wherever the field has just put them.
+  useMotionValueEvent(selection, "change", applyField)
 
   const trackPointer = useCallback((clientY: number) => {
     const nav = scrollRef.current
@@ -432,15 +510,27 @@ export function GalleryThumbnailStrip({
     applyField()
   }
 
-  useEffect(() => {
+  // useLayoutEffect, because the ring is placed from this measurement and has
+  // nowhere sensible to sit before it. Left in an effect, the first painted
+  // frame of a freshly opened gallery drew the ring at the top of the rail.
+  useLayoutEffect(() => {
     if (!isVertical || prefersReducedMotion) return
-    // A delete leaves the registries longer than the strip. Positions are keyed
-    // by display index, so trimming is all the compaction they need.
-    itemRefs.current.length = images.length
+    // A delete leaves the value registry longer than the strip. Positions are
+    // keyed by display index, so trimming is all the compaction it needs.
     valueRefs.current.length = images.length
     measure()
     applyField()
   }, [applyField, images.length, isVertical, measure, prefersReducedMotion])
+
+  // And again once the frames have re-registered their motion values, which they
+  // do in an effect and therefore after the layout pass above. A delete renumbers
+  // every display index below it, so the pass above writes the new geometry into
+  // the old numbering; this is the one that lands it on the right frames. It is
+  // the same idempotent pass, so on every other commit it changes nothing.
+  useEffect(() => {
+    if (!isVertical || prefersReducedMotion) return
+    applyField()
+  }, [applyField, images.length, isVertical, prefersReducedMotion])
 
   useEffect(() => {
     const nav = scrollRef.current
@@ -528,8 +618,31 @@ export function GalleryThumbnailStrip({
     const pointerSelected = pointerSelectRef.current
     pointerSelectRef.current = null
 
+    // The ring is aimed above the pointer check, and unconditionally: a press is
+    // the one selection the rail must *not* scroll to reveal, and it is still a
+    // selection the ring has to travel to. Only the scroll below is declined.
+    if (isVertical && !prefersReducedMotion) {
+      const target = displayIndexOf(currentIndex)
+      // A capture arriving or leaving renumbers every display index under the
+      // ring, so there is no travel to draw — the frame it is on has simply been
+      // relabelled. Springing across that renumbering would send it on a lap of
+      // the rail on every delete.
+      if (selectionCountRef.current !== images.length) {
+        selectionCountRef.current = images.length
+        selectionAnimation.current?.stop()
+        selectionAnimation.current = null
+        selection.jump(target)
+        applyField()
+      } else {
+        // Re-aimed rather than restarted, exactly like the scroll below: wheel
+        // steps arrive every 100ms against a 280ms spring, and handing the live
+        // value a new target is what carries the velocity across.
+        selectionAnimation.current = animate(selection, target, SELECTION_SPRING)
+      }
+    }
+
     const scroller = scrollRef.current
-    const item = itemRefs.current[displayIndexOf(currentIndex)]
+    const item = readFrames()[displayIndexOf(currentIndex)]
     if (!scroller || !item) return
     if (pointerSelected === currentIndex) return
 
@@ -567,6 +680,8 @@ export function GalleryThumbnailStrip({
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, images.length, orientation, prefersReducedMotion, scrollAxis, stopScroll])
+
+  const ridesOwnRing = isVertical && !prefersReducedMotion
 
   return (
     <nav
@@ -634,7 +749,6 @@ export function GalleryThumbnailStrip({
               orientation={orientation}
               prefersReducedMotion={Boolean(prefersReducedMotion)}
               selectionTransition={selectionTransition}
-              registerNode={registerNode}
               registerValues={registerValues}
               onSelect={() => onSelect(imageIndex)}
               // On the press, not the click: keyboard activation fires `click`
@@ -649,6 +763,43 @@ export function GalleryThumbnailStrip({
           )
         })}
       </div>
+
+      {/* The rail's selection ring — a sibling of the frames rather than a child
+          of the selected one. See `selection` above for why it had to leave.
+
+          Every number here mirrors the frame's own box and has to keep
+          mirroring it: `h-14 w-20` is the button's border box, `right-4`
+          answers the column's `pr-4` so the two right edges coincide, and
+          `origin-right` is the frames' own origin — which is what keeps that
+          edge fixed as the ring is magnified along with them. The stroke and
+          the radius scale with it exactly as they did when the frame carried
+          them, because it is still one transform doing the scaling.
+
+          Absolutely positioned inside the scroller, so it rides the rail's
+          scroll the way the frames do and shares the coordinate space the
+          measured centres are in. */}
+      {ridesOwnRing && images.length > 0 && (
+        <motion.div
+          aria-hidden
+          data-gallery-thumbnail-selection
+          className="pointer-events-none absolute right-4 top-0 z-10 h-14 w-20 origin-right"
+          style={{ y: ringY, scale: ringScale }}
+        >
+          <div
+            className="absolute inset-0.5 border-2 border-foreground"
+            // 8, not the 6 the gap arithmetic suggests: `border-radius`
+            // describes a box's outer edge, and this box is a 2px border. The
+            // ladder runs outward from the picture, each rung adding the
+            // distance travelled — image 4, +2px gap = 6 at the stroke's inner
+            // edge, +2px stroke = 8 here, +2px button border = 10 for the focus
+            // ring. Written this way CSS resolves the inner corner to 6 on its
+            // own, and every arc stays concentric; equal radii at different
+            // depths would pinch the gap shut at the corners, which is the thing
+            // that reads as wrong.
+            style={{ borderRadius: 8 }}
+          />
+        </motion.div>
+      )}
     </nav>
   )
 }
@@ -662,7 +813,6 @@ interface GalleryThumbnailFrameProps {
   orientation: "horizontal" | "vertical"
   prefersReducedMotion: boolean
   selectionTransition: Transition
-  registerNode: (displayIndex: number, node: HTMLButtonElement | null) => void
   registerValues: (displayIndex: number, values: FrameValues | null) => void
   onSelect: () => void
   onPressFrame: () => void
@@ -689,7 +839,6 @@ function GalleryThumbnailFrame({
   orientation,
   prefersReducedMotion,
   selectionTransition,
-  registerNode,
   registerValues,
   onSelect,
   onPressFrame,
@@ -712,20 +861,21 @@ function GalleryThumbnailFrame({
     y.set(0)
   }, [isVertical, scale, y])
 
+  const railDrawsRing = isVertical && !prefersReducedMotion
+
   return (
     <motion.button
-      ref={(node) => {
-        registerNode(displayIndex, node)
-        return () => registerNode(displayIndex, null)
-      }}
+      // The rail finds its frames by this attribute rather than by a registry
+      // they write themselves into; see `readFrames`.
+      data-thumbnail-frame=""
       type="button"
       aria-label={label}
       aria-current={selected ? "true" : undefined}
       // p-1 on the rail rather than p-0.5, and that is what buys the gap. The
-      // selection ring is `inset-0`, which resolves to this button's *padding*
-      // box, so the padding is the only room its 2px stroke has to live in —
-      // at 2px the stroke consumed all of it and sat flush against the picture.
-      // 4px is stroke plus the 2px of daylight the radii below are drawn for.
+      // selection ring is drawn 2px inside this box — inside the border, over
+      // the padding — so the padding is the only room its 2px stroke has to live
+      // in, and at 2px the stroke consumed all of it and sat flush against the
+      // picture. 4px is stroke plus the 2px of daylight the radii are drawn for.
       //
       // The button's own box stays 80×56: the rail's pitch, the measured
       // geometry, and the peak-scale fit (80 × 1.34 inside 112px) are all
@@ -751,7 +901,12 @@ function GalleryThumbnailFrame({
       onBlur={isVertical ? onBlurFrame : undefined}
       onClick={onSelect}
     >
-      {selected && (
+      {/* The rail draws its own ring, above; this is the strip's, and the
+          reduced-motion rail's. Both are cases where the ring's parent carries
+          no scale of its own — the strip never magnifies, and the rail's field
+          is switched off entirely under reduced motion — so the shared element
+          has nothing to trip over and can stay. */}
+      {selected && !railDrawsRing && (
         <motion.div
           layoutId={`gallery-thumbnail-selection-${orientation}`}
           data-gallery-thumbnail-selection
