@@ -38,7 +38,12 @@ const DESKTOP_MAX_SCALE = 1.34
 const DESKTOP_SPREAD = 2.5
 
 const DESKTOP_FALLBACK_HEIGHT = 56
-const DESKTOP_FALLBACK_GAP = 8
+// Mirrors the rail's `gap-0`: the frames abut, and the daylight between the
+// pictures comes from each button's own border and padding rather than from
+// flex. Pitch is measured off the live nodes, so this only stands in before
+// that measurement lands and for a rail of one — but it has to track the class,
+// or the field's reach is wrong on first paint.
+const DESKTOP_FALLBACK_GAP = 0
 
 /**
  * The mobile frame: 41×52, which is a 33×44 picture at 3:4.
@@ -602,8 +607,17 @@ export function GalleryThumbnailStrip({
             // py-16 rather than py-10: the frames at the ends of a long strip are
             // pushed ~35px outward by the displacement, and a transform does not
             // extend scrollHeight, so anything past the padding is simply clipped.
-            ? "min-h-full flex-col items-end justify-center gap-2 py-16 pl-12 pr-4"
-            : "w-max min-w-full items-center justify-center gap-2 px-1",
+            // gap-0, and it is deliberate rather than an omission: the frames
+            // already carry their own gap. Flex spaces *border* boxes, and the
+            // picture sits well inside its button — 2px transparent border plus
+            // 4px padding on the rail, 2px plus 2px on the strip — so two
+            // touching buttons still show 12px of daylight between pictures on
+            // the rail and 8px on the strip, which is the spacing. Neither inset
+            // is free to move: the border is the focus ring and the padding is
+            // the selection ring's only room. So the flex gap is what gives, and
+            // at these sizes it gives entirely.
+            ? "min-h-full flex-col items-end justify-center gap-0 py-16 pl-12 pr-4"
+            : "w-max min-w-full items-center justify-center gap-0 px-1",
         )}
       >
         {displayedImages.map((image, displayIndex) => {
