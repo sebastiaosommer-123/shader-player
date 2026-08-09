@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react"
 import { motion, useIsPresent, useReducedMotion } from "framer-motion"
+import * as Dialog from "@radix-ui/react-dialog"
 import { X, Download, Trash2 } from "lucide-react"
 import { BlossomCarousel, type BlossomCarouselHandle } from "@blossom-carousel/react"
 import { Button } from "@/components/ui/button"
@@ -56,6 +57,12 @@ export function WallpaperGalleryMobile({
   const { sliding, slideStyle, beginSlideIn } = useCaptureSlideIn()
 
   const carouselRef = useRef<BlossomCarouselHandle>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(
+    typeof document !== "undefined" && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  )
   const scrollFrameRef = useRef(0)
   const seededRef = useRef(false)
   // Read by the re-centring effect below, which must not re-run when the index
@@ -287,27 +294,51 @@ export function WallpaperGalleryMobile({
   const morphTransition = prefersReducedMotion ? reducedTransition : galleryMorph
 
   return (
-    // z-50 while the gallery owns the screen; below the thumbnail the moment it
-    // starts handing back.
-    //
-    // The collapse is not drawn by anything in here — the layoutId goes home to
-    // the thumbnail in the control bar, which sits at z-10. So for as long as
-    // this box stayed at z-50 it held an opaque backdrop over the top of that
-    // collapse, and the whole first half of the close played out underneath it:
-    // the capture vanished on the click frame, the screen went black, and the
-    // photo only reappeared once the backdrop had dissolved, by which point it
-    // was most of the way home. Dropping under the thumbnail lets the backdrop
-    // keep its unhurried fade and puts it where it belongs — behind the picture
-    // being put away, not on top of it.
-    //
-    // z-0 rather than anything higher because it has to lose to the thumbnail's
-    // z-10; it still paints over the canvas, which is unpositioned.
-    <div
+    <Dialog.Root
+      open
+      onOpenChange={(open) => {
+        if (!open && isPresent) handleClose()
+      }}
+    >
+      <Dialog.Content
+        forceMount
+        asChild
+        aria-modal="true"
+        aria-describedby={undefined}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          closeButtonRef.current?.focus({ preventScroll: true })
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          const restoreTarget = restoreFocusRef.current
+          requestAnimationFrame(() => {
+            if (restoreTarget?.isConnected) restoreTarget.focus({ preventScroll: true })
+          })
+        }}
+      >
+        {/* z-50 while the gallery owns the screen; below the thumbnail the moment it
+            starts handing back.
+
+            The collapse is not drawn by anything in here — the layoutId goes home to
+            the thumbnail in the control bar, which sits at z-10. So for as long as
+            this box stayed at z-50 it held an opaque backdrop over the top of that
+            collapse, and the whole first half of the close played out underneath it:
+            the capture vanished on the click frame, the screen went black, and the
+            photo only reappeared once the backdrop had dissolved, by which point it
+            was most of the way home. Dropping under the thumbnail lets the backdrop
+            keep its unhurried fade and puts it where it belongs — behind the picture
+            being put away, not on top of it.
+
+            z-0 rather than anything higher because it has to lose to the thumbnail's
+            z-10; it still paints over the canvas, which is unpositioned. */}
+        <div
       className={cn(
         "fixed inset-0",
         isPresent ? "z-50" : "z-0 pointer-events-none",
       )}
     >
+      <Dialog.Title className="sr-only">Captured image gallery</Dialog.Title>
       {/* Background — fades in/out independently.
           In fast, out slow, and deliberately not symmetric. The morph takes
           450ms; a backdrop that took half of that to arrive left the paused
@@ -480,6 +511,7 @@ export function WallpaperGalleryMobile({
 
         {imageCount > 0 && (
           <Button
+            ref={closeButtonRef}
             onClick={(e) => { e.stopPropagation(); handleClose() }}
             variant="ghost"
             size="icon"
@@ -524,6 +556,8 @@ export function WallpaperGalleryMobile({
           </>
         )}
       </motion.div>
-    </div>
+        </div>
+      </Dialog.Content>
+    </Dialog.Root>
   )
 }

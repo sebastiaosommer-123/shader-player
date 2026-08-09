@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react"
 import { motion, useIsPresent, useReducedMotion } from "framer-motion"
+import * as Dialog from "@radix-ui/react-dialog"
 import { X, Download, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { CapturedImage } from "@/lib/types"
@@ -54,6 +55,12 @@ export function WallpaperGalleryDesktop({
   const wheelDeltaRef = useRef(0)
   const lastWheelEventRef = useRef(0)
   const lastWheelStepRef = useRef(0)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const restoreFocusRef = useRef<HTMLElement | null>(
+    typeof document !== "undefined" && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  )
   const { slideStyle, beginSlideIn } = useCaptureSlideIn()
   // The capture as it is actually painted, for a close that has to draw its own
   // collapse. See handleClose.
@@ -263,25 +270,49 @@ export function WallpaperGalleryDesktop({
   const morphTransition = prefersReducedMotion ? reducedTransition : galleryMorph
 
   return (
-    // z-50 while the gallery owns the screen; below the toolbar the moment it
-    // starts handing back.
-    //
-    // Nothing in here draws the collapse — the layoutId goes home to the
-    // thumbnail in the floating toolbar, which is fixed at z-10. Staying at
-    // z-50 through the close therefore held an opaque backdrop over the top of
-    // that collapse, and the first half of it played out underneath: the
-    // capture vanished on the click frame, the screen went black, and the photo
-    // only reappeared once the backdrop had dissolved, by which point it was
-    // most of the way home.
-    //
-    // z-0 rather than anything higher because it has to lose to the toolbar's
-    // z-10; it still paints over the canvas, which is unpositioned.
-    <div
+    <Dialog.Root
+      open
+      onOpenChange={(open) => {
+        if (!open && isPresent) handleClose()
+      }}
+    >
+      <Dialog.Content
+        forceMount
+        asChild
+        aria-modal="true"
+        aria-describedby={undefined}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          closeButtonRef.current?.focus({ preventScroll: true })
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          const restoreTarget = restoreFocusRef.current
+          requestAnimationFrame(() => {
+            if (restoreTarget?.isConnected) restoreTarget.focus({ preventScroll: true })
+          })
+        }}
+      >
+        {/* z-50 while the gallery owns the screen; below the toolbar the moment it
+            starts handing back.
+
+            Nothing in here draws the collapse — the layoutId goes home to the
+            thumbnail in the floating toolbar, which is fixed at z-10. Staying at
+            z-50 through the close therefore held an opaque backdrop over the top of
+            that collapse, and the first half of it played out underneath: the
+            capture vanished on the click frame, the screen went black, and the photo
+            only reappeared once the backdrop had dissolved, by which point it was
+            most of the way home.
+
+            z-0 rather than anything higher because it has to lose to the toolbar's
+            z-10; it still paints over the canvas, which is unpositioned. */}
+        <div
       className={cn(
         "fixed inset-0",
         isPresent ? "z-50" : "z-0 pointer-events-none",
       )}
     >
+      <Dialog.Title className="sr-only">Captured image gallery</Dialog.Title>
       {/* Background — fades in/out independently */}
       <motion.div
         className="fixed inset-0 bg-background"
@@ -385,6 +416,7 @@ export function WallpaperGalleryDesktop({
 
         {images.length > 0 && (
           <Button
+            ref={closeButtonRef}
             onClick={(e) => { e.stopPropagation(); handleClose() }}
             variant="ghost"
             size="icon"
@@ -423,6 +455,8 @@ export function WallpaperGalleryDesktop({
           </>
         )}
       </motion.div>
-    </div>
+        </div>
+      </Dialog.Content>
+    </Dialog.Root>
   )
 }

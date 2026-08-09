@@ -79,11 +79,11 @@ interface CaptureThumbnailProps {
    */
   suppressMorph?: boolean
   /**
-   * Whether to scale up from nothing on mount.
+   * Whether to fade and settle into place on mount.
    *
    * True for a capture that has just been taken, which is what the arrival is
    * for; false when this is only being remounted to leave the layoutId stack,
-   * where replaying it would pop the thumbnail out of existence and back for no
+   * where replaying it would make the thumbnail disappear and return for no
    * reason the user could name.
    */
   animateArrival?: boolean
@@ -155,23 +155,23 @@ export function CaptureThumbnail({
     // remounts it and replays `initial` for every capture rather than only the
     // first.
     //
-    // Centred absolutely rather than sitting in flow, and scaled from 0 rather
-    // than from the usual 0.85. Both are for the desktop slot, which grows from
-    // 0 to 48 on this same spring at this same moment: a centred circle at
-    // scale s is exactly as wide as a slot at progress s, so the two track each
-    // other edge for edge and nothing ever needs clipping. Left in flow it
-    // would be pinned to the slot's left edge at full width and spill straight
-    // over the shader tabs, which is what it used to do.
+    // Centred absolutely rather than sitting in flow so the desktop slot can
+    // grow around it. Left in flow it would be pinned to the slot's left edge
+    // at full width and spill straight over the shader tabs, which is what it
+    // used to do. The flash masks the slot making room; the capture itself only
+    // settles from 0.95 so it always enters with a perceptible physical shape.
     //
     // Negative margins for the centring, not a translate: Framer owns the
     // transform on this element and a -50% translate would have to be carried
     // through every keyframe of the scale.
     //
-    // Scale alone, no opacity — growing from nothing is already the reveal, and
-    // a fade on top of it only makes the edge mushy.
     <motion.div
-      initial={prefersReducedMotion || !animateArrival ? false : { scale: 0 }}
-      animate={{ scale: 1 }}
+      initial={
+        prefersReducedMotion || !animateArrival
+          ? false
+          : { transform: "scale(0.95)", opacity: 0 }
+      }
+      animate={{ transform: "scale(1)", opacity: 1 }}
       // Held until the flash starts lifting; see captureFlash.holdEndMs.
       transition={
         prefersReducedMotion
@@ -200,7 +200,8 @@ export function CaptureThumbnail({
         className="active:scale-[0.97] transition-transform duration-150 ease-out motion-reduce:transition-none"
         style={{ width, height }}
       >
-        <motion.div
+        <motion.button
+          type="button"
           layoutId={morphs ? `gallery-container-${image.id}` : undefined}
           // What GalleryCloseFlight measures its landing box off. On the
           // thumbnail's own element rather than the slot around it, because this
@@ -208,7 +209,7 @@ export function CaptureThumbnail({
           // here.
           data-capture-thumbnail
           onClick={handleClick}
-          className="cursor-pointer relative group overflow-hidden"
+          className="group relative block cursor-pointer appearance-none overflow-hidden border-0 bg-transparent p-0 text-inherit outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           style={{
             width,
             height,
@@ -217,7 +218,6 @@ export function CaptureThumbnail({
           }}
           transition={transition}
           aria-label="View latest capture"
-          role="button"
         >
           {/* Centred by a flex parent rather than by a transform: the image below
               is a projection node, and Framer overwrites its transform on every
@@ -237,7 +237,7 @@ export function CaptureThumbnail({
             />
           </div>
           <div className="absolute inset-0 bg-white/0 group-hoverFine:bg-white/10 transition-colors duration-150 pointer-events-none" />
-        </motion.div>
+        </motion.button>
       </div>
     </motion.div>
   )

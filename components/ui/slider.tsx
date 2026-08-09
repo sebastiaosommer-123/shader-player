@@ -1681,8 +1681,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
               className="absolute left-0 rounded-full"
               initial={false}
               animate={{
-                top: isActive ? 7 : 8,
-                bottom: isActive ? 7 : 8,
+                transform: `translateY(-50%) scaleY(${isActive ? 1 : 8 / 9})`,
                 backgroundColor: isFocused
                   ? "var(--foreground)"
                   : isHovered
@@ -1690,7 +1689,13 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
                   : "color-mix(in srgb, var(--foreground) 45%, transparent)",
               }}
               transition={spring.fast}
-              style={{ width: 2 }}
+              style={{
+                top: "50%",
+                width: 2,
+                height: 18,
+                transformOrigin: "center",
+                willChange: "transform",
+              }}
             />
           </motion.div>
         )}

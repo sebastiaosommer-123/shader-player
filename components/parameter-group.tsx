@@ -59,7 +59,7 @@ export function ParameterGroup({ group, params, onChange, shaderId, spacing = "n
 
   return (
     <Collapsible open={!collapsed} onOpenChange={handleToggle}>
-      <CollapsibleTrigger className="group flex h-9 w-full items-center justify-between uppercase tracking-wider text-muted-foreground text-sm cursor-pointer hoverFine:text-foreground transition-colors duration-150 motion-reduce:transition-none">
+      <CollapsibleTrigger className="group flex h-9 w-full cursor-pointer items-center justify-between text-sm uppercase tracking-wider text-muted-foreground transition-[color,transform] duration-[125ms] ease-[cubic-bezier(0.23,1,0.32,1)] hoverFine:text-foreground active:scale-[0.99] motion-reduce:transform-none motion-reduce:transition-none">
         <h3>{group.name}</h3>
         {/* Deliberately not the dropdown's ChevronDown: that one opens a menu
             over the page, this reveals content in place. Pointing right at rest
