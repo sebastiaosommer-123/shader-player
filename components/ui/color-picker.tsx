@@ -2096,7 +2096,7 @@ const ColorPickerPopover = forwardRef<HTMLDivElement, ColorPickerPopoverProps>(
         <div ref={ref} className={cn("inline-flex w-full", wrapperClassName)}>
           <Popover.Trigger
             className={cn(
-              "flex items-center gap-2 h-9 px-2 border border-border bg-transparent hover:bg-hover transition-colors duration-80 outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)] cursor-pointer",
+              "flex items-center gap-2 h-9 px-2 border border-border bg-transparent hover:bg-hover transition-[background-color,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transform-none motion-reduce:transition-none outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)] cursor-pointer",
               shape.input,
               triggerClassName
             )}
