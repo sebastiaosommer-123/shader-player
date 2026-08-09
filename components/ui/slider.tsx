@@ -15,9 +15,11 @@ import {
   motion,
   useMotionValue,
   useTransform,
+  useReducedMotion,
   animate,
   AnimatePresence,
   type MotionValue,
+  type Transition,
 } from "framer-motion";
 import { Slider as SliderPrimitive } from "@base-ui/react/slider";
 import { cn } from "@/lib/utils";
@@ -73,6 +75,20 @@ const DOT_SIZE = 4;
 const PIP_SIZE = 5;
 // Inset track BG so its rounded-end centers align with thumb centers at min/max
 const TRACK_INSET = (THUMB_SIZE - TRACK_BG_HEIGHT) / 2;
+
+function moveMotionValue(
+  value: MotionValue<number>,
+  target: number,
+  transition: Transition,
+  prefersReducedMotion: boolean,
+) {
+  if (prefersReducedMotion) {
+    value.stop();
+    value.set(target);
+    return;
+  }
+  animate(value, target, transition);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -282,9 +298,15 @@ interface TooltipValueProps {
   value: number;
   formatValue: (v: number) => string;
   motionX: MotionValue<number>;
+  prefersReducedMotion: boolean;
 }
 
-function TooltipValue({ value, formatValue, motionX }: TooltipValueProps) {
+function TooltipValue({
+  value,
+  formatValue,
+  motionX,
+  prefersReducedMotion,
+}: TooltipValueProps) {
   const shape = useShape();
   const tooltipX = useTransform(motionX, (x) => x + THUMB_SIZE / 2);
   return (
@@ -294,9 +316,21 @@ function TooltipValue({ value, formatValue, motionX }: TooltipValueProps) {
         x: tooltipX,
         top: -16,
       }}
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 4, transition: spring.fast.exit }}
+      initial={
+        prefersReducedMotion
+          ? { opacity: 0 }
+          : { opacity: 0, y: 4 }
+      }
+      animate={
+        prefersReducedMotion
+          ? { opacity: 1 }
+          : { opacity: 1, y: 0 }
+      }
+      exit={
+        prefersReducedMotion
+          ? { opacity: 0, transition: spring.fast.exit }
+          : { opacity: 0, y: 4, transition: spring.fast.exit }
+      }
       transition={spring.fast}
     >
       <span
@@ -343,6 +377,7 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
     const isRange = Array.isArray(value);
     const values = toRadixValue(value);
     const shape = useShape();
+    const prefersReducedMotion = Boolean(useReducedMotion());
 
     // Non-uniform step mode: sorted, deduped list of allowed values. Keyed on
     // the joined string so inline array literals don't recompute every render.
@@ -501,16 +536,26 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
           const mn = minRef.current;
           const mx = maxRef.current;
           const px0 = valueToPixel(v[0], mn, mx, w);
-          animate(motionX0, px0, spring.moderate);
+          moveMotionValue(
+            motionX0,
+            px0,
+            spring.moderate,
+            prefersReducedMotion,
+          );
           if (isRange && v[1] !== undefined) {
             const px1 = valueToPixel(v[1], mn, mx, w);
-            animate(motionX1, px1, spring.moderate);
+            moveMotionValue(
+              motionX1,
+              px1,
+              spring.moderate,
+              prefersReducedMotion,
+            );
           }
         }
       });
       ro.observe(el);
       return () => ro.disconnect();
-    }, [isRange, motionX0, motionX1]);
+    }, [isRange, motionX0, motionX1, prefersReducedMotion]);
 
     // --- Sync motion values on value change (keyboard, programmatic) ---
     // Depend on a primitive key rather than the `values` array — its identity
@@ -524,12 +569,30 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
       if (tw <= 0) return;
       const v = valuesRef.current;
       const px0 = valueToPixel(v[0], min, max, tw);
-      animate(motionX0, px0, spring.moderate);
+      moveMotionValue(
+        motionX0,
+        px0,
+        spring.moderate,
+        prefersReducedMotion,
+      );
       if (isRange && v[1] !== undefined) {
         const px1 = valueToPixel(v[1], min, max, tw);
-        animate(motionX1, px1, spring.moderate);
+        moveMotionValue(
+          motionX1,
+          px1,
+          spring.moderate,
+          prefersReducedMotion,
+        );
       }
-    }, [valuesKey, min, max, isRange, motionX0, motionX1]);
+    }, [
+      valuesKey,
+      min,
+      max,
+      isRange,
+      motionX0,
+      motionX1,
+      prefersReducedMotion,
+    ]);
 
     // --- Range crossing prevention ---
     const clampForRange = useCallback(
@@ -611,8 +674,14 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
           snappedPx,
           activeDragThumb.current
         );
-        // Spring-animate thumb to clicked position
-        animate(motionX, finalPx, spring.moderate);
+        // Spring-animate thumb to the clicked position unless reduced motion
+        // asks direct manipulation to settle on the same frame.
+        moveMotionValue(
+          motionX,
+          finalPx,
+          spring.moderate,
+          prefersReducedMotion,
+        );
 
         // Update value
         const finalValue = pixelToValue(
@@ -627,7 +696,19 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
 
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
-      [disabled, isRange, min, max, step, stepValues, motionX0, motionX1, clampForRange, emitChange]
+      [
+        disabled,
+        isRange,
+        min,
+        max,
+        step,
+        stepValues,
+        motionX0,
+        motionX1,
+        clampForRange,
+        emitChange,
+        prefersReducedMotion,
+      ]
     );
 
     const handlePointerMove = useCallback(
@@ -691,8 +772,21 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
       const currentPx = motionX.get();
       const snapped = pixelToValue(currentPx, min, max, step, tw, stepValues);
       const snappedPx = valueToPixel(snapped, min, max, tw);
-      animate(motionX, snappedPx, spring.moderate);
-    }, [min, max, step, stepValues, motionX0, motionX1]);
+      moveMotionValue(
+        motionX,
+        snappedPx,
+        spring.moderate,
+        prefersReducedMotion,
+      );
+    }, [
+      min,
+      max,
+      step,
+      stepValues,
+      motionX0,
+      motionX1,
+      prefersReducedMotion,
+    ]);
 
     // --- Radix keyboard handler ---
     // In steps mode the primitive runs on indices (0..len-1, step 1) so arrow
@@ -886,6 +980,7 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
                   value={values[0]}
                   formatValue={formatValue}
                   motionX={motionX0}
+                  prefersReducedMotion={prefersReducedMotion}
                 />
               )}
               {isInteracting && isRange && values[1] !== undefined && (
@@ -894,6 +989,7 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
                   value={values[1]}
                   formatValue={formatValue}
                   motionX={motionX1}
+                  prefersReducedMotion={prefersReducedMotion}
                 />
               )}
             </AnimatePresence>
@@ -970,9 +1066,21 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
                 <motion.div
                   key="hover-tooltip"
                   className="absolute -translate-x-1/2 pointer-events-none z-20"
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 4, transition: spring.fast.exit }}
+                  initial={
+                    prefersReducedMotion
+                      ? { opacity: 0 }
+                      : { opacity: 0, y: 4 }
+                  }
+                  animate={
+                    prefersReducedMotion
+                      ? { opacity: 1 }
+                      : { opacity: 1, y: 0 }
+                  }
+                  exit={
+                    prefersReducedMotion
+                      ? { opacity: 0, transition: spring.fast.exit }
+                      : { opacity: 0, y: 4, transition: spring.fast.exit }
+                  }
                   transition={spring.fast}
                   style={{
                     left: hoverPreview.cursorX,
@@ -1065,10 +1173,20 @@ const Slider = forwardRef<HTMLDivElement, SliderProps>(
                       className="rounded-full flex-shrink-0"
                       initial={false}
                       animate={{
-                        width: isHovered ? DOT_SIZE * 1.25 : DOT_SIZE,
-                        height: isHovered ? DOT_SIZE * 1.25 : DOT_SIZE,
+                        width:
+                          prefersReducedMotion || !isHovered
+                            ? DOT_SIZE
+                            : DOT_SIZE * 1.25,
+                        height:
+                          prefersReducedMotion || !isHovered
+                            ? DOT_SIZE
+                            : DOT_SIZE * 1.25,
                       }}
-                      transition={spring.moderate}
+                      transition={
+                        prefersReducedMotion
+                          ? { duration: 0 }
+                          : spring.moderate
+                      }
                       style={{
                         backgroundColor: "var(--muted-foreground)",
                         opacity: 0.3,
@@ -1148,6 +1266,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
     const [showHoverTooltip, setShowHoverTooltip] = useState(false);
     const hoverDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const shape = useShape();
+    const prefersReducedMotion = Boolean(useReducedMotion());
 
     // Half the hover tooltip's rendered width, measured rather than assumed:
     // it holds whatever `formatValue` returns, so its width changes with the
@@ -1295,7 +1414,7 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
 
       pendingKeyboardValueRef.current = null;
 
-      if (isKeyboardSync) {
+      if (isKeyboardSync || prefersReducedMotion) {
         fillPercent.stop();
         zeroOffset.stop();
         fillPercent.set(percent);
@@ -1305,7 +1424,16 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
 
       animate(fillPercent, percent, spring.fast);
       animate(zeroOffset, nextZeroOffset, spring.fast);
-    }, [value, min, max, variant, fillPercent, zeroOffset, zeroTarget]);
+    }, [
+      value,
+      min,
+      max,
+      variant,
+      fillPercent,
+      zeroOffset,
+      zeroTarget,
+      prefersReducedMotion,
+    ]);
 
     const getValueFromX = useCallback(
       (clientX: number) => {
@@ -1339,11 +1467,31 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         const newVal = getValueFromX(e.clientX);
         onChange(newVal);
         const newPercent = Math.max(0, Math.min(1, (newVal - min) / (max - min)));
-        animate(fillPercent, newPercent, spring.fast);
-        animate(zeroOffset, newVal === min ? zeroTarget : 0, spring.fast);
+        moveMotionValue(
+          fillPercent,
+          newPercent,
+          spring.fast,
+          prefersReducedMotion,
+        );
+        moveMotionValue(
+          zeroOffset,
+          newVal === min ? zeroTarget : 0,
+          spring.fast,
+          prefersReducedMotion,
+        );
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
-      [disabled, getValueFromX, onChange, fillPercent, zeroOffset, zeroTarget, min, max]
+      [
+        disabled,
+        getValueFromX,
+        onChange,
+        fillPercent,
+        zeroOffset,
+        zeroTarget,
+        min,
+        max,
+        prefersReducedMotion,
+      ]
     );
 
     const handlePointerMove = useCallback(
@@ -1355,11 +1503,31 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         if (variant === "scrubber") {
           fillPercent.set(newPercent);
         } else {
-          animate(fillPercent, newPercent, spring.fast);
+          moveMotionValue(
+            fillPercent,
+            newPercent,
+            spring.fast,
+            prefersReducedMotion,
+          );
         }
-        animate(zeroOffset, newVal === min ? zeroTarget : 0, spring.fast);
+        moveMotionValue(
+          zeroOffset,
+          newVal === min ? zeroTarget : 0,
+          spring.fast,
+          prefersReducedMotion,
+        );
       },
-      [getValueFromX, onChange, variant, fillPercent, zeroOffset, zeroTarget, min, max]
+      [
+        getValueFromX,
+        onChange,
+        variant,
+        fillPercent,
+        zeroOffset,
+        zeroTarget,
+        min,
+        max,
+        prefersReducedMotion,
+      ]
     );
 
     const handlePointerUp = useCallback(() => {
@@ -1380,10 +1548,25 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         const newVal = getValueFromX(e.clientX);
         onChange(newVal);
         fillPercent.set(Math.max(0, Math.min(1, (newVal - min) / (max - min))));
-        animate(zeroOffset, newVal === min ? zeroTarget : 0, spring.fast);
+        moveMotionValue(
+          zeroOffset,
+          newVal === min ? zeroTarget : 0,
+          spring.fast,
+          prefersReducedMotion,
+        );
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       },
-      [disabled, getValueFromX, onChange, fillPercent, zeroOffset, zeroTarget, min, max]
+      [
+        disabled,
+        getValueFromX,
+        onChange,
+        fillPercent,
+        zeroOffset,
+        zeroTarget,
+        min,
+        max,
+        prefersReducedMotion,
+      ]
     );
 
     const handleResizePointerMove = useCallback(
@@ -1392,9 +1575,23 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
         const newVal = getValueFromX(e.clientX);
         onChange(newVal);
         fillPercent.set(Math.max(0, Math.min(1, (newVal - min) / (max - min))));
-        animate(zeroOffset, newVal === min ? zeroTarget : 0, spring.fast);
+        moveMotionValue(
+          zeroOffset,
+          newVal === min ? zeroTarget : 0,
+          spring.fast,
+          prefersReducedMotion,
+        );
       },
-      [getValueFromX, onChange, fillPercent, zeroOffset, zeroTarget, min, max]
+      [
+        getValueFromX,
+        onChange,
+        fillPercent,
+        zeroOffset,
+        zeroTarget,
+        min,
+        max,
+        prefersReducedMotion,
+      ]
     );
 
     const handleResizePointerUp = useCallback(() => {
@@ -1445,9 +1642,21 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
               ref={tooltipRef}
               key="hover-tooltip"
               className="absolute -translate-x-1/2 pointer-events-none z-20"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 4, transition: spring.fast.exit }}
+              initial={
+                prefersReducedMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, y: 4 }
+              }
+              animate={
+                prefersReducedMotion
+                  ? { opacity: 1 }
+                  : { opacity: 1, y: 0 }
+              }
+              exit={
+                prefersReducedMotion
+                  ? { opacity: 0, transition: spring.fast.exit }
+                  : { opacity: 0, y: 4, transition: spring.fast.exit }
+              }
               transition={spring.fast}
               style={{
                 // Clamped to the track, not centred on the cursor outright.
@@ -1614,15 +1823,23 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
             className="absolute rounded-full pointer-events-none z-[3]"
             initial={false}
             animate={{
-              top: isActive ? 7 : 8,
-              bottom: isActive ? 7 : 8,
+              top: prefersReducedMotion || !isActive ? 8 : 7,
+              bottom: prefersReducedMotion || !isActive ? 8 : 7,
               backgroundColor: isFocused
                 ? "var(--foreground)"
                 : isHovered
                 ? "color-mix(in srgb, var(--foreground) 65%, transparent)"
                 : "color-mix(in srgb, var(--foreground) 45%, transparent)",
             }}
-            transition={spring.fast}
+            transition={
+              prefersReducedMotion
+                ? {
+                    top: { duration: 0 },
+                    bottom: { duration: 0 },
+                    backgroundColor: spring.fast,
+                  }
+                : spring.fast
+            }
             style={{
               left: pipsHandleLineLeftStyle,
               width: 2,
@@ -1681,14 +1898,23 @@ const SliderComfortable = forwardRef<HTMLDivElement, SliderComfortableProps>(
               className="absolute left-0 rounded-full"
               initial={false}
               animate={{
-                transform: `translateY(-50%) scaleY(${isActive ? 1 : 8 / 9})`,
+                transform: prefersReducedMotion
+                  ? "translateY(-50%) scaleY(1)"
+                  : `translateY(-50%) scaleY(${isActive ? 1 : 8 / 9})`,
                 backgroundColor: isFocused
                   ? "var(--foreground)"
                   : isHovered
                   ? "color-mix(in srgb, var(--foreground) 65%, transparent)"
                   : "color-mix(in srgb, var(--foreground) 45%, transparent)",
               }}
-              transition={spring.fast}
+              transition={
+                prefersReducedMotion
+                  ? {
+                      transform: { duration: 0 },
+                      backgroundColor: spring.fast,
+                    }
+                  : spring.fast
+              }
               style={{
                 top: "50%",
                 width: 2,

@@ -3,7 +3,12 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react"
 import { useReducedMotion } from "framer-motion"
 import type { ShaderParams } from "@/lib/shader-uniforms"
-import { initShader, updateUniforms } from "@/lib/shader-renderer"
+import {
+  disposeShader,
+  initShader,
+  updateUniforms,
+  type ShaderResources,
+} from "@/lib/shader-renderer"
 
 interface ShaderCanvasProps {
   params: ShaderParams
@@ -19,7 +24,7 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
   const prefersReducedMotion = useReducedMotion()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<WebGLRenderingContext | null>(null)
-  const programRef = useRef<WebGLProgram | null>(null)
+  const resourcesRef = useRef<ShaderResources | null>(null)
   const animationRef = useRef<number | null>(null)
   const paramsRef = useRef<ShaderParams>(params)
   const shaderIdRef = useRef<string>(shaderId)
@@ -66,11 +71,21 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
   }, [isPaused, prefersReducedMotion])
 
   useEffect(() => {
-    if (shaderIdRef.current !== shaderId && glRef.current) {
-      console.log("[v0] Shader changed, reinitializing program")
-      shaderIdRef.current = shaderId
-      programRef.current = initShader(glRef.current, shaderId)
-    }
+    if (shaderIdRef.current === shaderId) return
+
+    const gl = glRef.current
+    if (!gl) return
+
+    console.log("[v0] Shader changed, reinitializing program")
+    const next = initShader(gl, shaderId)
+    if (!next) return
+
+    const previous = resourcesRef.current
+    resourcesRef.current = next
+    shaderIdRef.current = shaderId
+    drawFrameRef.current?.()
+
+    if (previous) disposeShader(gl, previous)
   }, [shaderId])
 
   useEffect(() => {
@@ -89,7 +104,7 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
     }
 
     glRef.current = gl
-    programRef.current = initShader(gl, shaderId)
+    resourcesRef.current = initShader(gl, shaderIdRef.current)
 
     const startTime = Date.now()
     totalPausedTimeRef.current = 0
@@ -103,9 +118,18 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
     }
 
     const drawFrame = () => {
-      if (!gl || !programRef.current) return
+      const resources = resourcesRef.current
+      if (!resources) return
 
-      updateUniforms(gl, programRef.current, paramsRef.current, elapsed(), canvas.width, canvas.height, shaderIdRef.current)
+      updateUniforms(
+        gl,
+        resources.program,
+        paramsRef.current,
+        elapsed(),
+        canvas.width,
+        canvas.height,
+        shaderIdRef.current,
+      )
 
       gl.clearColor(0, 0, 0, 1)
       gl.clear(gl.COLOR_BUFFER_BIT)
@@ -139,7 +163,7 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
     window.addEventListener("resize", resize)
 
     const render = () => {
-      if (!gl || !programRef.current || isPausedRef.current || reducedMotionRef.current) {
+      if (!resourcesRef.current || isPausedRef.current || reducedMotionRef.current) {
         isLoopRunningRef.current = false
         return
       }
@@ -156,14 +180,20 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
     return () => {
       resizeObserver.disconnect()
       window.removeEventListener("resize", resize)
-      if (animationRef.current) {
+      if (animationRef.current !== null) {
         cancelAnimationFrame(animationRef.current)
+        animationRef.current = null
       }
+      if (resourcesRef.current) {
+        disposeShader(gl, resourcesRef.current)
+        resourcesRef.current = null
+      }
+      glRef.current = null
       renderFnRef.current = null
       drawFrameRef.current = null
       isLoopRunningRef.current = false
     }
-  }, [shaderId])
+  }, [])
 
   return <canvas ref={canvasRef} className="w-full h-full" />
 })

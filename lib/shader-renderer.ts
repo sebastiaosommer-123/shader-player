@@ -412,8 +412,20 @@ function hexToRgb(hex: string): [number, number, number] {
     : [0, 0, 0]
 }
 
-export function initShader(gl: WebGLRenderingContext, shaderId: string): WebGLProgram | null {
+export interface ShaderResources {
+  program: WebGLProgram
+  positionBuffer: WebGLBuffer
+}
+
+export function disposeShader(gl: WebGLRenderingContext, resources: ShaderResources) {
+  gl.deleteBuffer(resources.positionBuffer)
+  gl.deleteProgram(resources.program)
+}
+
+export function initShader(gl: WebGLRenderingContext, shaderId: string): ShaderResources | null {
   const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource)
+  if (!vertexShader) return null
+
   const fragmentShaderSource =
     shaderId === "terracotta"
       ? terracottaFragmentShaderSource
@@ -424,21 +436,43 @@ export function initShader(gl: WebGLRenderingContext, shaderId: string): WebGLPr
           : terracottaFragmentShaderSource
   const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource)
 
-  if (!vertexShader || !fragmentShader) return null
+  if (!fragmentShader) {
+    gl.deleteShader(vertexShader)
+    return null
+  }
 
   const program = gl.createProgram()
-  if (!program) return null
+  if (!program) {
+    gl.deleteShader(vertexShader)
+    gl.deleteShader(fragmentShader)
+    return null
+  }
 
   gl.attachShader(program, vertexShader)
   gl.attachShader(program, fragmentShader)
   gl.linkProgram(program)
 
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+  const linked = gl.getProgramParameter(program, gl.LINK_STATUS)
+  if (!linked) {
     console.error("[v0] Program link error:", gl.getProgramInfoLog(program))
+  }
+
+  gl.detachShader(program, vertexShader)
+  gl.detachShader(program, fragmentShader)
+  gl.deleteShader(vertexShader)
+  gl.deleteShader(fragmentShader)
+
+  if (!linked) {
+    gl.deleteProgram(program)
     return null
   }
 
   const positionBuffer = gl.createBuffer()
+  if (!positionBuffer) {
+    gl.deleteProgram(program)
+    return null
+  }
+
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
 
@@ -446,7 +480,7 @@ export function initShader(gl: WebGLRenderingContext, shaderId: string): WebGLPr
   gl.enableVertexAttribArray(positionLocation)
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0)
 
-  return program
+  return { program, positionBuffer }
 }
 
 export function updateUniforms(

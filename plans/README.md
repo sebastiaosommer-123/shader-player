@@ -1,23 +1,26 @@
 # Animation improvement plans
 
-Plans are stamped against commit `0b865e8`. Each executor must stop and report
-if the cited source has drifted instead of improvising around it.
+Plans 001–003 are stamped against commit `0b865e8`; plans 004–008 are stamped
+against commit `3ae9987`. Each executor must stop and report if the cited source
+has drifted instead of improvising around it, except where a listed dependency
+explicitly describes the expected earlier-plan changes.
 
 | Plan | Title | Severity | Status | Depends on |
 | --- | --- | --- | --- | --- |
 | [001](001-reduced-motion-shader-canvas.md) | Freeze continuous shader motion for reduced-motion users | HIGH | DONE | — |
 | [002](002-compositor-safe-sliders.md) | Move slider drag rendering onto transforms | HIGH | DONE | — |
 | [003](003-instant-keyboard-slider-updates.md) | Make keyboard slider steps immediate | HIGH | DONE | 002 |
+| [004](004-suppress-shader-group-mount-animations.md) | Animate parameter groups only when the user toggles them | HIGH | DONE | — |
+| [005](005-single-pass-shader-program-swaps.md) | Compile each shader program once per selection | HIGH | DONE | — |
+| [006](006-compositor-safe-color-surface.md) | Move color-surface cursors with compositor transforms | HIGH | DONE | — |
+| [007](007-compositor-safe-gallery-rail.md) | Compose gallery-rail motion into transform strings | HIGH | DONE | — |
+| [008](008-reduced-motion-parameter-overlays.md) | Remove parameter-control movement under reduced motion | MEDIUM | DONE | 006 |
 
-## Recommended execution order
+## Execution status
 
-1. Execute 001 to close the dominant full-screen accessibility gap.
-2. Execute 002 to establish the slider's compositor-safe render geometry.
-3. Execute 003 against the post-002 slider, adding the keyboard-specific direct-update policy without undoing the transform work.
-
-Plans 001 and 002 touch different source files and may be executed in parallel.
-Plan 003 must wait for plan 002 because both edit `components/ui/slider.tsx` and
-003 assumes that 002 preserved `fillPercent`, `zeroOffset`, and `zeroTarget`.
+Plans 001–008 are implemented and verified. Plan 008 was executed after plan
+006 so its color-picker accessibility branches preserve the compositor-safe
+saturation cursor work.
 
 ## Status values
 

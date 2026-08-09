@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { spring, exitFallbackMs } from "@/lib/springs";
 import { fontWeights } from "@/lib/font-weight";
@@ -136,6 +136,7 @@ function FluidTooltip({
   const shape = useShape();
   const portalContainer = useContext(TooltipPortalContainerContext);
   const hasAmbientProvider = useContext(TooltipGroupContext);
+  const prefersReducedMotion = Boolean(useReducedMotion());
 
   useEffect(() => {
     if (open) setMounted(true);
@@ -183,12 +184,16 @@ function FluidTooltip({
                 className
               )}
               style={{ fontVariationSettings: fontWeights.medium }}
-              initial={{ opacity: 0, ...slideOffset }}
-              animate={{
-                opacity: open ? 1 : 0,
-                x: 0,
-                y: 0,
-              }}
+              initial={
+                prefersReducedMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, ...slideOffset }
+              }
+              animate={
+                prefersReducedMotion
+                  ? { opacity: open ? 1 : 0 }
+                  : { opacity: open ? 1 : 0, x: 0, y: 0 }
+              }
               transition={open ? spring.fast : spring.fast.exit}
               onAnimationComplete={handleExitComplete}
             >

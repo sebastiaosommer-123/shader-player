@@ -7,13 +7,19 @@ import {
   useRef,
   useState,
   useEffect,
+  useLayoutEffect,
   useCallback,
   useMemo,
   type CSSProperties,
   type HTMLAttributes,
   type ReactNode,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useMotionValue,
+  useReducedMotion,
+} from "framer-motion";
 import { Popover } from "@base-ui/react/popover";
 import { Menu } from "@base-ui/react/menu";
 import { NumberField } from "@base-ui/react/number-field";
@@ -427,36 +433,78 @@ interface SaturationSquareProps {
   onChange: (s: number, v: number) => void;
 }
 
+const cursorTransform = (x: number, y: number) =>
+  `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+
 function SaturationSquare({ h, s, v, onChange }: SaturationSquareProps) {
   const ref = useRef<HTMLDivElement>(null);
-  // State (not a ref): this gates the ghost hover cursor during render, and a
-  // ref mutation wouldn't re-render, letting the ghost stick around.
   const [dragging, setDragging] = useState(false);
   const hasMoved = useRef(false);
   const [focused, setFocused] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  // React only mounts and unmounts the ghost cursor. Pointer movement writes
+  // its full compositor transform directly without scheduling a render.
+  const [hoverCursorVisible, setHoverCursorVisible] = useState(false);
+  const hoverCursorVisibleRef = useRef(false);
+  const selectedTransform = useMotionValue(
+    "translate3d(0px, 0px, 0) translate(-50%, -50%)"
+  );
+  const hoverTransform = useMotionValue(
+    "translate3d(0px, 0px, 0) translate(-50%, -50%)"
+  );
+  const selectedValueRef = useRef({ s, v });
+  selectedValueRef.current = { s, v };
   const shape = useShape();
 
-  const updateFromPointer = useCallback(
-    (clientX: number, clientY: number) => {
-      const rect = ref.current?.getBoundingClientRect();
-      if (!rect) return;
-      const x = clamp01((clientX - rect.left) / rect.width);
-      const y = clamp01((clientY - rect.top) / rect.height);
-      onChange(x, 1 - y);
-    },
-    [onChange]
-  );
+  const syncSelectedCursor = useCallback(() => {
+    const node = ref.current;
+    if (!node) return;
+    const { s: nextS, v: nextV } = selectedValueRef.current;
+    selectedTransform.set(
+      cursorTransform(nextS * node.clientWidth, (1 - nextV) * node.clientHeight)
+    );
+  }, [selectedTransform]);
 
-  const updateCursorPos = useCallback((clientX: number, clientY: number) => {
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect) return;
-    setCursorPos({
-      x: clamp01((clientX - rect.left) / rect.width) * 100,
-      y: clamp01((clientY - rect.top) / rect.height) * 100,
-    });
-  }, []);
+  useLayoutEffect(() => {
+    syncSelectedCursor();
+  }, [s, v, syncSelectedCursor]);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(syncSelectedCursor);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [syncSelectedCursor]);
+
+  const positionCursorsFromPointer = useCallback(
+    (clientX: number, clientY: number, moveSelected: boolean) => {
+      const node = ref.current;
+      if (!node) return null;
+      const rect = node.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+
+      const normalizedX = clamp01((clientX - rect.left) / rect.width);
+      const normalizedY = clamp01((clientY - rect.top) / rect.height);
+      const layoutX = normalizedX * node.clientWidth;
+      const layoutY = normalizedY * node.clientHeight;
+      hoverTransform.set(cursorTransform(layoutX, layoutY));
+
+      if (!hoverCursorVisibleRef.current) {
+        hoverCursorVisibleRef.current = true;
+        setHoverCursorVisible(true);
+      }
+
+      if (moveSelected) {
+        selectedTransform.set(cursorTransform(layoutX, layoutY));
+      }
+      return {
+        s: normalizedX,
+        v: 1 - normalizedY,
+      };
+    },
+    [hoverTransform, selectedTransform]
+  );
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -465,19 +513,24 @@ function SaturationSquare({ h, s, v, onChange }: SaturationSquareProps) {
       setDragging(true);
       hasMoved.current = false;
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-      updateFromPointer(e.clientX, e.clientY);
+      const next = positionCursorsFromPointer(e.clientX, e.clientY, true);
+      if (next) onChange(next.s, next.v);
     },
-    [updateFromPointer]
+    [onChange, positionCursorsFromPointer]
   );
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      updateCursorPos(e.clientX, e.clientY);
-      if (!dragging) return;
+      const next = positionCursorsFromPointer(
+        e.clientX,
+        e.clientY,
+        dragging
+      );
+      if (!dragging || !next) return;
       hasMoved.current = true;
-      updateFromPointer(e.clientX, e.clientY);
+      onChange(next.s, next.v);
     },
-    [dragging, updateFromPointer, updateCursorPos]
+    [dragging, onChange, positionCursorsFromPointer]
   );
 
   const onPointerUp = useCallback(() => {
@@ -516,7 +569,8 @@ function SaturationSquare({ h, s, v, onChange }: SaturationSquareProps) {
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => {
         setHovered(false);
-        setCursorPos(null);
+        hoverCursorVisibleRef.current = false;
+        setHoverCursorVisible(false);
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -541,31 +595,25 @@ function SaturationSquare({ h, s, v, onChange }: SaturationSquareProps) {
         }}
       />
       <motion.div
-        className="absolute pointer-events-none rounded-full"
-        initial={false}
-        animate={{
-          left: `${s * 100}%`,
-          top: `${(1 - v) * 100}%`,
+        className="absolute left-0 top-0 pointer-events-none rounded-full"
+        style={{
           width: 18,
           height: 18,
-        }}
-        transition={{ duration: 0 }}
-        style={{
-          transform: "translate(-50%, -50%)",
+          transform: selectedTransform,
+          willChange: "transform",
           border: "1px solid white",
           boxShadow: "0 0 0 1px rgba(0,0,0,1)",
           backgroundColor: thumbColor,
         }}
       />
-      {hovered && !dragging && cursorPos && (
-        <div
-          className="absolute pointer-events-none rounded-full"
+      {hovered && !dragging && hoverCursorVisible && (
+        <motion.div
+          className="absolute left-0 top-0 pointer-events-none rounded-full"
           style={{
-            left: `${cursorPos.x}%`,
-            top: `${cursorPos.y}%`,
             width: 18,
             height: 18,
-            transform: "translate(-50%, -50%)",
+            transform: hoverTransform,
+            willChange: "transform",
             border: "2px solid rgba(255, 255, 255, 0.55)",
             boxShadow: "0 0 0 1px rgba(0, 0, 0, 0.2)",
           }}
@@ -767,6 +815,27 @@ function FormatDropdown({
   const portalContainer = useContext(ColorPickerPortalContainerContext);
   const containerRef = useRef<HTMLDivElement>(null);
   const ChevronDownIcon = useIcon("chevron-down");
+  const prefersReducedMotion = Boolean(useReducedMotion());
+
+  const fastGeometryTransition = prefersReducedMotion
+    ? {
+        top: { duration: 0 },
+        left: { duration: 0 },
+        width: { duration: 0 },
+        height: { duration: 0 },
+        opacity: { duration: 0.08 },
+      }
+    : { ...spring.fast, opacity: { duration: 0.08 } };
+
+  const moderateGeometryTransition = prefersReducedMotion
+    ? {
+        top: { duration: 0 },
+        left: { duration: 0 },
+        width: { duration: 0 },
+        height: { duration: 0 },
+        opacity: { duration: 0.08 },
+      }
+    : { ...spring.moderate, opacity: { duration: 0.08 } };
 
   const {
     activeIndex,
@@ -842,7 +911,7 @@ function FormatDropdown({
           size={14}
           strokeWidth={1.5}
           className={cn(
-            "text-muted-foreground transition-transform duration-150",
+            "text-muted-foreground transition-transform duration-150 motion-reduce:transform-none",
             open && "rotate-180"
           )}
         />
@@ -855,11 +924,17 @@ function FormatDropdown({
           className="z-[60] outline-none"
         >
           <motion.div
-            initial={{ opacity: 0, y: -4, scaleY: 0.96 }}
-            animate={
-              open
-                ? { opacity: 1, y: 0, scaleY: 1 }
+            initial={
+              prefersReducedMotion
+                ? { opacity: 0 }
                 : { opacity: 0, y: -4, scaleY: 0.96 }
+            }
+            animate={
+              prefersReducedMotion
+                ? { opacity: open ? 1 : 0 }
+                : open
+                  ? { opacity: 1, y: 0, scaleY: 1 }
+                  : { opacity: 0, y: -4, scaleY: 0.96 }
             }
             transition={open ? spring.fast : spring.fast.exit}
             style={{ transformOrigin: "top center" }}
@@ -926,10 +1001,7 @@ function FormatDropdown({
                         opacity: isHoveringOther ? 0.8 : 1,
                       }}
                       exit={{ opacity: 0, transition: spring.moderate.exit }}
-                      transition={{
-                        ...spring.moderate,
-                        opacity: { duration: 0.08 },
-                      }}
+                      transition={moderateGeometryTransition}
                     />
                   )}
                 </AnimatePresence>
@@ -955,10 +1027,7 @@ function FormatDropdown({
                         height: activeRect.height,
                       }}
                       exit={{ opacity: 0, transition: spring.fast.exit }}
-                      transition={{
-                        ...spring.fast,
-                        opacity: { duration: 0.08 },
-                      }}
+                      transition={fastGeometryTransition}
                     />
                   )}
                 </AnimatePresence>
@@ -976,10 +1045,7 @@ function FormatDropdown({
                         height: focusRect.height + 4,
                       }}
                       exit={{ opacity: 0, transition: spring.fast.exit }}
-                      transition={{
-                        ...spring.fast,
-                        opacity: { duration: 0.08 },
-                      }}
+                      transition={fastGeometryTransition}
                     />
                   )}
                 </AnimatePresence>
@@ -1974,6 +2040,7 @@ const ColorPickerPopover = forwardRef<HTMLDivElement, ColorPickerPopoverProps>(
     const actionsRef = useRef<{ unmount: () => void; close: () => void } | null>(null);
     const [panelEl, setPanelEl] = useState<HTMLDivElement | null>(null);
     const shape = useShape();
+    const prefersReducedMotion = Boolean(useReducedMotion());
     const substrate = useSurface();
     const level = Math.min(substrate + 2, 8);
 
@@ -2081,11 +2148,17 @@ const ColorPickerPopover = forwardRef<HTMLDivElement, ColorPickerPopoverProps>(
               className="z-50 outline-none"
             >
               <motion.div
-                initial={{ opacity: 0, y: -4, scaleY: 0.96 }}
-                animate={
-                  open
-                    ? { opacity: 1, y: 0, scaleY: 1 }
+                initial={
+                  prefersReducedMotion
+                    ? { opacity: 0 }
                     : { opacity: 0, y: -4, scaleY: 0.96 }
+                }
+                animate={
+                  prefersReducedMotion
+                    ? { opacity: open ? 1 : 0 }
+                    : open
+                      ? { opacity: 1, y: 0, scaleY: 1 }
+                      : { opacity: 0, y: -4, scaleY: 0.96 }
                 }
                 transition={open ? spring.moderate : spring.moderate.exit}
                 style={{ transformOrigin: "top left" }}

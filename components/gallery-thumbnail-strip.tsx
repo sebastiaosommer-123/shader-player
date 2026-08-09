@@ -139,9 +139,10 @@ const FIELD_SPRING = { type: "spring", duration: 0.22, bounce: 0 } as const
 const falloff = (distance: number) => (distance >= 1 ? 0 : (1 + Math.cos(Math.PI * distance)) / 2)
 
 interface FrameValues {
-  scale: MotionValue<number>
-  y: MotionValue<number>
+  transform: MotionValue<string>
 }
+
+const IDENTITY_TRANSFORM = "translate3d(0, 0px, 0) scale(1)"
 
 /**
  * The gallery's filmstrip.
@@ -164,8 +165,8 @@ interface FrameValues {
  *
  * It also never re-renders while you track across it. The pointer position and
  * one 0→1 strength live in motion values; a single subscriber recomputes the
- * whole field in one O(n) pass and writes two motion values per frame, and React
- * sits it out entirely.
+ * whole field in one O(n) pass and writes one composed transform motion value
+ * per frame, and React sits it out entirely.
  */
 export function GalleryThumbnailStrip({
   images,
@@ -296,8 +297,7 @@ export function GalleryThumbnailStrip({
   const selectionAnimation = useRef<AnimationPlaybackControls | null>(null)
   /** −1 so the first aim is a jump, not a flight up from frame zero. */
   const selectionCountRef = useRef(-1)
-  const ringY = useMotionValue(0)
-  const ringScale = useMotionValue(1)
+  const ringTransform = useMotionValue(IDENTITY_TRANSFORM)
 
   useEffect(() => () => selectionAnimation.current?.stop(), [])
 
@@ -395,8 +395,10 @@ export function GalleryThumbnailStrip({
     for (let index = 0; index < count; index += 1) {
       const values = valueRefs.current[index]
       if (!values) continue
-      values.scale.set(scales[index])
-      values.y.set(spread[index] - anchor)
+      const translateY = spread[index] - anchor
+      values.transform.set(
+        `translate3d(0, ${translateY}px, 0) scale(${scales[index]})`,
+      )
     }
 
     // The ring, out of the same pass and the same numbers: whatever the field is
@@ -407,11 +409,14 @@ export function GalleryThumbnailStrip({
     const between = ringPosition - lower
     const lowerCenter = (centers[lower] ?? 0) + spread[lower] - anchor
     const upperCenter = (centers[upper] ?? 0) + spread[upper] - anchor
-    ringScale.set(scales[lower] + (scales[upper] - scales[lower]) * between)
+    const nextRingScale = scales[lower] + (scales[upper] - scales[lower]) * between
     // The ring's box is the frame's own, pinned to the rail's top, so the
     // translate carries its centre to the frame's centre.
-    ringY.set(lowerCenter + (upperCenter - lowerCenter) * between - height / 2)
-  }, [ringScale, ringY, selection, strength])
+    const nextRingY = lowerCenter + (upperCenter - lowerCenter) * between - height / 2
+    ringTransform.set(
+      `translate3d(0, ${nextRingY}px, 0) scale(${nextRingScale})`,
+    )
+  }, [ringTransform, selection, strength])
 
   // The strength spring is what carries the field in and out; every frame of it
   // needs the whole field recomputed, since the scales it multiplies also drive
@@ -783,7 +788,7 @@ export function GalleryThumbnailStrip({
           aria-hidden
           data-gallery-thumbnail-selection
           className="pointer-events-none absolute right-4 top-0 z-10 h-14 w-20 origin-right"
-          style={{ y: ringY, scale: ringScale }}
+          style={{ transform: ringTransform, willChange: "transform" }}
         >
           <div
             className="absolute inset-0.5 border-2 border-foreground"
@@ -823,12 +828,10 @@ interface GalleryThumbnailFrameProps {
 /**
  * One frame.
  *
- * It owns its two motion values rather than the strip owning an array of them,
- * because the count changes as captures come and go and `useMotionValue` cannot
- * be called a variable number of times. The strip writes to them through the
- * registry, which costs nothing and keeps the frame a real motion component — so
- * Framer's projection still knows about the scale when the selection ring morphs
- * from one frame to the next across it.
+ * It owns its transform motion value rather than the strip owning an array of
+ * them, because the count changes as captures come and go and `useMotionValue`
+ * cannot be called a variable number of times. The strip writes through the
+ * registry, which costs nothing and keeps the frame a real motion component.
  */
 function GalleryThumbnailFrame({
   image,
@@ -845,21 +848,19 @@ function GalleryThumbnailFrame({
   onFocusFrame,
   onBlurFrame,
 }: GalleryThumbnailFrameProps) {
-  const scale = useMotionValue(1)
-  const y = useMotionValue(0)
+  const transform = useMotionValue(IDENTITY_TRANSFORM)
 
   useEffect(() => {
     if (!isVertical) return
-    const values = { scale, y }
+    const values = { transform }
     registerValues(displayIndex, values)
     return () => registerValues(displayIndex, null)
-  }, [displayIndex, isVertical, registerValues, scale, y])
+  }, [displayIndex, isVertical, registerValues, transform])
 
   useEffect(() => {
     if (isVertical) return
-    scale.set(1)
-    y.set(0)
-  }, [isVertical, scale, y])
+    transform.set(IDENTITY_TRANSFORM)
+  }, [isVertical, transform])
 
   const railDrawsRing = isVertical && !prefersReducedMotion
 
@@ -889,7 +890,7 @@ function GalleryThumbnailFrame({
           ? "h-14 w-20 origin-right rounded-[10px] p-1"
           : `${MOBILE_FRAME_CLASS} rounded-[5px] p-0.5`,
       )}
-      style={isVertical ? { scale, y } : undefined}
+      style={isVertical ? { transform, willChange: "transform" } : undefined}
       // The press affordance stays on the horizontal strip's `scale` only
       // because nothing else is writing to it there. On the rail it lives on the
       // inner wrapper below instead: `whileTap` and the magnification both own

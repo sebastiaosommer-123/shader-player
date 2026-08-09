@@ -34,25 +34,23 @@ export function ParameterGroup({ group, params, onChange, shaderId, spacing = "n
   // above the slider and so pokes out of the top of an open group. Clip only
   // while the height is actually moving.
   //
-  // Starts `true`, so the clip is in the server-rendered markup. The class that
-  // runs the open animation lives in the stylesheet, and its keyframe begins at
-  // `height: 0` — so the animation plays before any JS does. Starting `false`
-  // meant those pre-hydration frames had full-height content in a zero-height
-  // box with nothing clipping it, and every group painted over its neighbours
-  // until hydration fired animationstart.
+  // Starts `true`, so the clip is in the server-rendered markup while the
+  // persisted collapsed state takes over during hydration. Later user-driven
+  // animations keep managing the same clip through animationstart/end.
   const [animating, setAnimating] = useState(true)
+  const [animateDisclosure, setAnimateDisclosure] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
 
   // Release that initial clip once hydrated, if nothing is actually running.
-  // The animation may have finished before React arrived, or `motion-reduce`
-  // may have suppressed it outright — in both cases no animationend is coming
-  // to clear the flag, and the clip would otherwise be permanent.
+  // Fresh mounts intentionally do not animate, so no animationend is coming to
+  // clear the flag, and the clip would otherwise be permanent.
   useEffect(() => {
     const el = contentRef.current
     if (el && el.getAnimations().length === 0) setAnimating(false)
   }, [])
 
   const handleToggle = () => {
+    setAnimateDisclosure(true)
     playDigitalClick("weak")
     toggleCollapsed()
   }
@@ -84,7 +82,9 @@ export function ParameterGroup({ group, params, onChange, shaderId, spacing = "n
           if (e.target === e.currentTarget) setAnimating(false)
         }}
         className={cn(
-          "data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up motion-reduce:animate-none",
+          animateDisclosure &&
+            "data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up",
+          "motion-reduce:animate-none",
           (animating || collapsed) && "overflow-hidden"
         )}
       >
