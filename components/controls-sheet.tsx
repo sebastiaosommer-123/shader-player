@@ -10,6 +10,7 @@ import { getShaderConfig } from "@/lib/shader-configs"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { CreditsFooter } from "./credits-footer"
 import { ParameterGroup } from "./parameter-group"
+import { ShaderTabs } from "./shader-tabs"
 
 interface ControlsSheetProps {
   params: ShaderParams
@@ -17,9 +18,17 @@ interface ControlsSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   shaderId: string
+  onShaderChange: (shaderId: string) => void
 }
 
-export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId }: ControlsSheetProps) {
+export function ControlsSheet({
+  params,
+  setParams,
+  open,
+  onOpenChange,
+  shaderId,
+  onShaderChange,
+}: ControlsSheetProps) {
   const prefersReducedMotion = useReducedMotion()
   const returnFocusRef = useRef<HTMLElement | null>(null)
   let sheetDuration = open ? "250ms" : "200ms"
@@ -55,7 +64,7 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId 
           // `dark` matches the mobile control bar: this sheet only ever opens
           // on mobile, so it stays on the dark palette whatever the page theme
           // is.
-          className="dark fixed bottom-0 left-0 right-0 z-50 h-[400px] rounded-t-2xl border-t border-border bg-background text-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-bottom-full data-[state=closed]:slide-out-to-bottom-full data-[state=closed]:pointer-events-none motion-reduce:animate-none sm:h-[80vh]"
+          className="dark fixed bottom-0 left-0 right-0 z-50 flex h-[400px] flex-col rounded-t-2xl border-t border-border bg-background text-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-bottom-full data-[state=closed]:slide-out-to-bottom-full data-[state=closed]:pointer-events-none motion-reduce:animate-none sm:h-[80vh]"
           style={{
             animationDuration: sheetDuration,
             animationTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
@@ -65,7 +74,7 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId 
             <button
               type="button"
               onClick={() => playDigitalClick("strong")}
-              className="flex w-full items-center justify-between px-4 py-4 transition-transform duration-[125ms] ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] motion-reduce:transform-none motion-reduce:transition-none"
+              className="flex w-full shrink-0 items-center justify-between px-4 py-4 transition-transform duration-[125ms] ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.99] motion-reduce:transform-none motion-reduce:transition-none"
             >
               <DialogPrimitive.Title asChild>
                 <span className="font-mono text-sm">Shader Controls</span>
@@ -74,9 +83,27 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId 
             </button>
           </DialogPrimitive.Close>
 
+          {/* Pinned above the scroll region rather than sitting at the top of it:
+              which shader you are on is the frame for everything below, and a
+              frame that scrolls away is not one. */}
+          <div className="shrink-0 px-4 pb-4">
+            <ShaderTabs
+              shaderId={shaderId}
+              onShaderChange={onShaderChange}
+              layoutIdPrefix="sheet"
+              size="mobile"
+            />
+          </div>
+
           <div
             data-state={open ? "open" : "closed"}
-            className="flex h-[calc(100%-56px)] flex-col space-y-6 overflow-y-auto px-4 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 motion-reduce:animate-none"
+            // flex-1 min-h-0 rather than the h-[calc(100%-56px)] this used to be.
+            // That 56 was the header's height written down in a second place, and
+            // it stopped being the whole of the chrome above the moment the shader
+            // picker was pinned here — the scroll region ran off the bottom of the
+            // sheet by exactly the picker's height. Letting flex do the
+            // arithmetic means there is no number to keep in step.
+            className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto px-4 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 motion-reduce:animate-none"
             style={{
               paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))",
               animationDuration: contentDuration,
@@ -84,9 +111,6 @@ export function ControlsSheet({ params, setParams, open, onOpenChange, shaderId 
               animationDelay: !prefersReducedMotion && open ? "50ms" : "0ms",
             }}
           >
-            {/* No shader picker here: the tab bar in the control bar behind this
-                sheet already shows all three, so the sheet is purely the active
-                shader's parameters. */}
             {shaderConfig.parameterGroups.map((group) => (
               <ParameterGroup
                 // Keyed by shader too — see the matching note in ControlsSidebar.

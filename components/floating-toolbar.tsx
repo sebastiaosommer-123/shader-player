@@ -10,10 +10,15 @@ import { cn } from "@/lib/utils"
 import { CaptureSlot } from "./capture-slot"
 import { ShutterButton } from "./shutter-button"
 import { ShaderTabs } from "./shader-tabs"
+import { ModeTabs, type CaptureMode } from "./mode-tabs"
 
 interface FloatingToolbarProps {
   shaderId: string
   onShaderChange: (shaderId: string) => void
+  mode: CaptureMode
+  onModeChange: (mode: CaptureMode) => void
+  /** Hidden entirely where MediaRecorder is unavailable; see app/page.tsx. */
+  videoSupported: boolean
   onCapture: () => void
   captures: Capture[]
   onThumbnailClick: (captureIndex: number) => void
@@ -35,6 +40,9 @@ interface FloatingToolbarProps {
 export function FloatingToolbar({
   shaderId,
   onShaderChange,
+  mode,
+  onModeChange,
+  videoSupported,
   onCapture,
   captures,
   onThumbnailClick,
@@ -127,6 +135,16 @@ export function FloatingToolbar({
       </motion.div>
 
       <ShaderTabs shaderId={shaderId} onShaderChange={onShaderChange} layoutIdPrefix="desktop" />
+
+      {/* Between the shader tabs and the shutter, and the order is the whole
+          argument: this track changes what the button beside it *does*, so it
+          belongs against the button. The shader tabs change the artwork, so they
+          stay against the artwork's end of the bar. Two identical-looking tracks
+          side by side is a real legibility risk, and adjacency is what tells you
+          which is which without either having to look different. */}
+      {videoSupported && (
+        <ModeTabs mode={mode} onModeChange={onModeChange} layoutIdPrefix="desktop" />
+      )}
 
       <ShutterButton onPress={onCapture} />
     </Elevated>

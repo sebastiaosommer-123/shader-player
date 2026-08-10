@@ -5,8 +5,8 @@ import type { ShaderParams } from "@/lib/shader-uniforms"
 import type { Capture } from "@/lib/types"
 import { ControlsSheet } from "./controls-sheet"
 import { CaptureSlot } from "./capture-slot"
-import { ShaderTabs } from "./shader-tabs"
 import { ShutterButton } from "./shutter-button"
+import { ModeTabs, type CaptureMode } from "./mode-tabs"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { useReducedMotion } from "framer-motion"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -28,6 +28,10 @@ interface MobileNavProps {
   setParams: (params: ShaderParams) => void
   shaderId: string
   onShaderChange: (shaderId: string) => void
+  mode: CaptureMode
+  onModeChange: (mode: CaptureMode) => void
+  /** Hidden entirely where MediaRecorder is unavailable; see app/page.tsx. */
+  videoSupported: boolean
   captures: Capture[]
   onThumbnailClick: (captureIndex: number) => void
   /** Passed straight through to the thumbnail; see CaptureThumbnail. */
@@ -40,6 +44,9 @@ export function MobileNav({
   setParams,
   shaderId,
   onShaderChange,
+  mode,
+  onModeChange,
+  videoSupported,
   captures,
   onThumbnailClick,
   suppressMorph,
@@ -118,13 +125,21 @@ export function MobileNav({
               )}
             </div>
 
+            {/* The shader picker used to live here. It moved into the sheet when
+                the capture mode arrived, because only one track fits between the
+                thumbnail and the filters button — and of the two, mode is the one
+                that has to be reachable in a single tap: it decides what the
+                shutter above it does. The shader is a look, and looks belong with
+                the parameters that shape them. */}
             <div className="transition-[opacity,transform]" style={hideWhileSheetOpen(180)}>
-              <ShaderTabs
-                shaderId={shaderId}
-                onShaderChange={onShaderChange}
-                layoutIdPrefix="mobile"
-                size="mobile"
-              />
+              {videoSupported && (
+                <ModeTabs
+                  mode={mode}
+                  onModeChange={onModeChange}
+                  layoutIdPrefix="mobile"
+                  size="mobile"
+                />
+              )}
             </div>
 
             <button
@@ -155,6 +170,7 @@ export function MobileNav({
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         shaderId={shaderId}
+        onShaderChange={onShaderChange}
       />
     </>
   )

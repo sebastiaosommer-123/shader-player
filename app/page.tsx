@@ -13,6 +13,8 @@ import type { Capture } from "@/lib/types"
 import { encodeFullResolution, freezeFrame, previewDataUrl } from "@/lib/canvas-capture"
 import { warmPngEncoder } from "@/lib/png-encoder"
 import { CaptureDismissal } from "@/components/capture-dismissal"
+import type { CaptureMode } from "@/components/mode-tabs"
+import { isVideoCaptureSupported } from "@/lib/video-capture"
 import { CaptureFlash } from "@/components/capture-flash"
 import { Toaster } from "@/components/ui/sonner"
 import { captureFlash } from "@/lib/springs"
@@ -29,6 +31,51 @@ export default function Home() {
   const prefersReducedMotion = useReducedMotion()
   const { isResizing, startResize } = useResizableSidebar()
   const [params, setParams] = useState<ShaderParams>(getShaderConfig("terracotta").defaultParams)
+
+  /**
+   * What the shutter produces, and whether the shader is running.
+   *
+   * Seeded "video" for everyone, including on the server, and corrected to
+   * "image" in the effect below for anyone who asked for reduced motion. It
+   * cannot be seeded from the hook directly: framer's useReducedMotion returns
+   * null server-side and the real answer on the client's first render, so
+   * useState(prefersReducedMotion ? …) is a hydration mismatch — and the default
+   * has to be "video" regardless, because booting a shader player into a still
+   * image would be the wrong app.
+   */
+  const [mode, setMode] = useState<CaptureMode>("video")
+  const modeChosenRef = useRef(false)
+
+  useEffect(() => {
+    // Reduced motion picks the *initial* mode and nothing else. It is
+    // deliberately absent from isFrozen below: choosing a mode named Video is
+    // the consent for motion, and a runtime term would silently undo that
+    // choice every time the gallery closed. This supersedes the boundary plan
+    // 001 drew, which put the decision inside the canvas.
+    //
+    // Never overrules a deliberate choice — note that framer's hook does not
+    // re-subscribe, so this settles once on the client's first render.
+    if (!modeChosenRef.current && prefersReducedMotion) setMode("image")
+  }, [prefersReducedMotion])
+
+  const handleModeChange = (next: CaptureMode) => {
+    modeChosenRef.current = true
+    setMode(next)
+  }
+
+  /**
+   * Whether this browser can record at all.
+   *
+   * Starts true so the server render and the client's first paint agree, and so
+   * the 99% get the control with no shift; the rare browser without
+   * MediaRecorder drops it one commit later. Hidden rather than disabled — a
+   * two-item control with one item permanently greyed is worse than no control,
+   * and with it gone the app is exactly what it was before video existed.
+   */
+  const [videoSupported, setVideoSupported] = useState(true)
+  useEffect(() => {
+    setVideoSupported(isVideoCaptureSupported())
+  }, [])
 
   const [captures, setCaptures] = useState<Capture[]>([])
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
@@ -59,11 +106,12 @@ export default function Home() {
     return () => window.clearTimeout(timer)
   }, [])
 
-  // Every reason the canvas stops, in one place. The canvas itself used to OR
-  // reduced motion in privately, which meant no caller could see the whole
-  // answer; it is derived here now because this is the only component that knows
-  // all the terms.
-  const isFrozen = isGalleryOpen || Boolean(prefersReducedMotion)
+  // Every reason the canvas stops, in one place, and reduced motion is not among
+  // them — it chose the mode above, and the mode is what speaks here.
+  //
+  // Image mode is frame rate zero by definition. The gallery is opaque over the
+  // canvas, so running the shader behind it is work nobody can see.
+  const isFrozen = isGalleryOpen || mode === "image"
 
   const handleShaderChange = (newShaderId: string) => {
     console.log("[v0] Changing shader to:", newShaderId)
@@ -238,6 +286,9 @@ export default function Home() {
         setParams={setParams}
         shaderId={shaderId}
         onShaderChange={handleShaderChange}
+        mode={mode}
+        onModeChange={handleModeChange}
+        videoSupported={videoSupported}
         captures={captures}
         onThumbnailClick={handleThumbnailClick}
         suppressMorph={!!closeFlight}
@@ -249,6 +300,9 @@ export default function Home() {
       <FloatingToolbar
         shaderId={shaderId}
         onShaderChange={handleShaderChange}
+        mode={mode}
+        onModeChange={handleModeChange}
+        videoSupported={videoSupported}
         onCapture={handleCapture}
         captures={captures}
         onThumbnailClick={handleThumbnailClick}
