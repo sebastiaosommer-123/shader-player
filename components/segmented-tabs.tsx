@@ -39,13 +39,21 @@ interface SegmentedTabsProps {
  * Not one set of numbers for both bars: each track has to sit with whatever its
  * own bar puts beside it, and the two bars put different things there.
  *
- * Both tracks are 48 tall with 4px of inset, which puts their cells at 40. That
- * keeps the track's ends on the same line as the thumbnail slot and the shutter
- * either side of it, while the selected cell stays a step down from them — the
- * tabs are where you are, not the thing you came here to press.
+ * The desktop track is 44 tall with 4px of inset, which puts its cells at 36. 44
+ * is the desktop bar's one unit — the thumbnail slot and the shutter either side
+ * of this are the same number (SLOT_SIZE in lib/toolbar-geometry.ts, and
+ * SHUTTER_SIZES in shutter-button.tsx). That keeps the track's ends on the same
+ * line as both, while the selected cell stays a step inside them — the tabs are
+ * where you are, not the thing you came here to press. The three move together or
+ * not at all: the bar is content-sized, so leaving one of them taller makes it
+ * the bar's height and the other two float in the middle of it.
  *
- * The height is the fixed number and the width is not: cells are `h-10 px-3`
- * rather than `size-10`, so each one is as wide as the word it holds. A square
+ * Mobile keeps its cells at 40. It shares nothing with the desktop bar but this
+ * component — that bar is sized for thumbs, and its own row has no slot or
+ * shutter beside the track to line up with.
+ *
+ * The height is the fixed number and the width is not: cells are `h-9 px-3`
+ * rather than `size-9`, so each one is as wide as the word it holds. A square
  * cell is what a numeral wanted; a word wants a pill.
  *
  * 13px rather than text-sm, which is what the sliders are set at. A numeral gave
@@ -56,22 +64,19 @@ interface SegmentedTabsProps {
  *
  * They differ only between the cells: desktop butts them, mobile spaces them for
  * the touch targets.
+ *
+ * `cellHeight` is the pixel value of the `cell` class, and half of it is the
+ * indicator's radius. Written out rather than left to `rounded-full`, because
+ * the indicator morphs *width* as well as position — the cells are not all the
+ * same size. Framer's layout projection interpolates whatever number it is
+ * given, so a 9999px sentinel rides the whole morph as an ellipse; the real
+ * radius stays a pill at both ends. Same lesson as SLOT_RADIUS in
+ * lib/toolbar-geometry.ts. Keep it in step with the class beside it.
  */
 const SIZES = {
-  desktop: { track: "gap-0 p-1", cell: "h-10 px-3", text: "text-[13px]" },
-  mobile: { track: "gap-1 p-1", cell: "h-10 px-3", text: "text-[13px]" },
+  desktop: { track: "gap-0 p-1", cell: "h-9 px-3", text: "text-[13px]", cellHeight: 36 },
+  mobile: { track: "gap-1 p-1", cell: "h-10 px-3", text: "text-[13px]", cellHeight: 40 },
 } as const
-
-/**
- * The selected cell's height, and so half of it is the indicator's radius.
- *
- * Written out rather than left to `rounded-full`, because the indicator morphs
- * *width* as well as position — the cells are not all the same size. Framer's
- * layout projection interpolates whatever number it is given, so a 9999px
- * sentinel rides the whole morph as an ellipse; 20 is the real radius and stays
- * a pill at both ends. Same lesson as SLOT_RADIUS in lib/toolbar-geometry.ts.
- */
-const CELL_HEIGHT = 40
 
 /**
  * A row of choices with the selected one raised out of the track.
@@ -145,7 +150,7 @@ export function SegmentedTabs({
                 transition={spring.moderate}
                 aria-hidden
                 className={cn("absolute inset-0", raised)}
-                style={{ borderRadius: CELL_HEIGHT / 2 }}
+                style={{ borderRadius: SIZES[size].cellHeight / 2 }}
               />
             )}
             {/* Above the indicator, which is painted into the same box. */}

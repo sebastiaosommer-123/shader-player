@@ -18,21 +18,26 @@ import { cn } from "@/lib/utils"
  * app needs it.
  *
  * The proportions are not shared between them and should not be: the desktop
- * shutter sits in a 48px bar next to a 48px thumbnail slot and has to line up
- * with both, while the mobile one owns its own row and is sized for a thumb.
+ * shutter sits in the floating bar next to a 44px thumbnail slot and two 44px
+ * tab tracks and has to line up with all of them (SLOT_SIZE in
+ * lib/toolbar-geometry.ts, SIZES in segmented-tabs.tsx), while the mobile one
+ * owns its own row and is sized for a thumb.
  * What *is* shared is the relationship — a ring deliberately heavier than the
  * gap it encloses, because at low contrast a thin ring plus a wide gap reads as
  * two concentric shapes rather than as one shutter.
  *
  * `fill` is written out rather than derived, so the arithmetic is checkable at a
- * glance: 48 − 2×2.5 − 2×1.5 = 40, and 68 − 2×4 − 2×2 = 56.
+ * glance: 44 − 2×2.5 − 2×1.5 = 36, and 68 − 2×4 − 2×2 = 56. The ring and its gap
+ * are the numbers held fixed when the bar's unit changed, not the fill — they are
+ * the two that read as weights rather than as size, and thinning either to keep a
+ * rounder fill is what turns the shutter back into two concentric shapes.
  *
  * `stop` is the rounded square the fill becomes while recording — the universal
  * stop glyph, at the fraction of the fill that reads as "the same control in a
  * different state" rather than as a new one.
  */
 const SHUTTER_SIZES = {
-  desktop: { size: 48, ring: 2.5, fill: 40, stop: 17, stopRadius: 5 },
+  desktop: { size: 44, ring: 2.5, fill: 36, stop: 15, stopRadius: 4.5 },
   mobile: { size: 68, ring: 4, fill: 56, stop: 24, stopRadius: 7 },
 } as const
 
