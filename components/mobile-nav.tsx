@@ -6,12 +6,13 @@ import type { Capture } from "@/lib/types"
 import { ControlsSheet } from "./controls-sheet"
 import { CaptureSlot } from "./capture-slot"
 import { ShaderTabs } from "./shader-tabs"
+import { ShutterButton } from "./shutter-button"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { useReducedMotion } from "framer-motion"
 import { useIsMobile } from "@/hooks/use-mobile"
 
-/** Matches the iOS camera proportions: shutter ring, round thumb, round control. */
-const CAPTURE_SIZE = 68
+/** Matches the iOS camera proportions: round thumb, round control. The shutter
+ *  owns its own geometry; see SHUTTER_SIZES in ShutterButton. */
 const THUMBNAIL_SIZE = 44
 const FILTERS_SIZE = 48
 /**
@@ -80,20 +81,12 @@ export function MobileNav({
             centre line without the absolute positioning it used to need, and the
             row below carries the three things you reach for between shots. */}
         <div className="flex flex-col items-center gap-3">
-          <button
-            onClick={() => {
-              playDigitalClick("strong")
-              onCapture()
-            }}
-            // Ring deliberately heavier than the gap it encloses: at low contrast
-            // a thin ring plus a wide gap reads as two concentric shapes rather
-            // than one shutter.
-            className="group flex items-center justify-center rounded-full border-4 border-foreground bg-transparent p-[2px] shadow-none transition-[opacity,transform] hoverFine:bg-transparent"
-            aria-label="Capture frame"
-            style={{ ...hideWhileSheetOpen(150), width: CAPTURE_SIZE, height: CAPTURE_SIZE }}
-          >
-            <span className="size-full rounded-full bg-foreground transition-transform duration-100 ease-out group-active:scale-90 motion-reduce:transition-none" />
-          </button>
+          <ShutterButton
+            size="mobile"
+            onPress={onCapture}
+            className="transition-[opacity,transform]"
+            style={hideWhileSheetOpen(150)}
+          />
 
           {/* The outer slots are the same width, which is what keeps the tabs
               optically centred under the shutter. */}

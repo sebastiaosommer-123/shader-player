@@ -7,8 +7,8 @@ import { Elevated } from "@/lib/elevated"
 import { captureFlash, spring } from "@/lib/springs"
 import { BAR_GAP, SLOT_RADIUS, SLOT_SIZE } from "@/lib/toolbar-geometry"
 import { cn } from "@/lib/utils"
-import { CaptureButton } from "./capture-button"
 import { CaptureSlot } from "./capture-slot"
+import { ShutterButton } from "./shutter-button"
 import { ShaderTabs } from "./shader-tabs"
 
 interface FloatingToolbarProps {
@@ -128,7 +128,7 @@ export function FloatingToolbar({
 
       <ShaderTabs shaderId={shaderId} onShaderChange={onShaderChange} layoutIdPrefix="desktop" />
 
-      <CaptureButton onCapture={onCapture} />
+      <ShutterButton onPress={onCapture} />
     </Elevated>
   )
 }
