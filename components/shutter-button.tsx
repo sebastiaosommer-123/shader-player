@@ -1,7 +1,16 @@
 "use client"
 
-import type { CSSProperties } from "react"
+import { useEffect, type CSSProperties } from "react"
+import {
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+  type MotionValue,
+} from "framer-motion"
 import { playDigitalClick } from "@/lib/audio-feedback"
+import { spring } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 
 /**
@@ -17,15 +26,29 @@ import { cn } from "@/lib/utils"
  *
  * `fill` is written out rather than derived, so the arithmetic is checkable at a
  * glance: 48 − 2×2.5 − 2×1.5 = 40, and 68 − 2×4 − 2×2 = 56.
+ *
+ * `stop` is the rounded square the fill becomes while recording — the universal
+ * stop glyph, at the fraction of the fill that reads as "the same control in a
+ * different state" rather than as a new one.
  */
 const SHUTTER_SIZES = {
-  desktop: { size: 48, ring: 2.5, gap: 1.5, fill: 40 },
-  mobile: { size: 68, ring: 4, gap: 2, fill: 56 },
+  desktop: { size: 48, ring: 2.5, fill: 40, stop: 17, stopRadius: 5 },
+  mobile: { size: 68, ring: 4, fill: 56, stop: 24, stopRadius: 7 },
 } as const
+
+/** How long the ring takes to empty before it starts filling. */
+const RING_EMPTY_MS = 120
+
+/** The track's weight against the arc's. Opacity, not hue — there is no hue here. */
+const TRACK_OPACITY = 0.3
 
 interface ShutterButtonProps {
   onPress: () => void
   size?: keyof typeof SHUTTER_SIZES
+  /** Drives the glyph and the ring. */
+  isRecording?: boolean
+  /** 0 → 1 across the recording cap. Ignored unless recording. */
+  progress?: MotionValue<number>
   ariaLabel?: string
   /** The mobile bar hides its controls behind the sheet with opacity/transform. */
   style?: CSSProperties
@@ -45,61 +68,162 @@ interface ShutterButtonProps {
  * part of the body and only the button travels; scaling both would read as the
  * whole shutter assembly shrinking into the bar.
  *
- * Hover pulls the ink back to 90%, ring and fill together — the same /90 the
- * Button variants use for a solid control, so the shutter answers the pointer
- * the way every other filled control in here does. Moving both keeps them
- * reading as one shutter rather than a disc dimming inside a ring that didn't.
- * One token, both themes, and it lands the right way round in each: the palette
- * is achromatic, so 90% of the ink is 10% of the surface behind it. Light mode's
- * dark shutter lifts toward the bar; dark mode's near-white one settles into it.
+ * Ring and fill are both `currentColor`, which is what keeps them moving
+ * together: the hover pulls the ink back to 90% on the button and both follow.
+ * The same /90 every other solid control in here uses, and it lands the right
+ * way round in both themes because the palette is achromatic — 90% of the ink is
+ * 10% of the surface behind it, so light mode's dark shutter lifts toward the
+ * bar and dark mode's near-white one settles into it.
  *
  * hoverFine, not hover: a touch device would otherwise latch the state on after
  * a tap and hold it there through the capture.
+ *
+ * **Recording is drawn achromatically**, which is the one place this departs
+ * from every camera ever made. There is no red in this design to be coherent
+ * with, so introducing one for a fifteen-second state would make it the loudest
+ * thing in the app. Instead the ring — already present, already the camera body
+ * — empties and refills as a progress track, and the fill becomes the stop
+ * glyph. The elapsed time is legible in the viewfinder, where a camera puts it.
  */
 export function ShutterButton({
   onPress,
   size = "desktop",
-  ariaLabel = "Capture frame",
+  isRecording = false,
+  progress,
+  ariaLabel,
   style,
   className,
 }: ShutterButtonProps) {
   const geometry = SHUTTER_SIZES[size]
+  const prefersReducedMotion = useReducedMotion()
+
+  /**
+   * How much of the ring is drawn: 1 is the solid ring at rest, 0 is empty.
+   *
+   * Its own value rather than reading `progress` directly, because the ring has
+   * to *empty* before it fills. Watching it drain and come back is what makes
+   * the same ring read as a progress track without anything being added to the
+   * shutter — and jumping straight to zero would just look like the ring
+   * disappeared.
+   */
+  const ringFill = useMotionValue(1)
+  const dashOffset = useTransform(ringFill, (value) => 1 - value)
+
+  useEffect(() => {
+    if (!isRecording) {
+      if (prefersReducedMotion) {
+        ringFill.set(1)
+        return
+      }
+      const controls = animate(ringFill, 1, { duration: RING_EMPTY_MS / 1000, ease: "easeOut" })
+      return () => controls.stop()
+    }
+
+    // Only follow progress once the ring has drained, or the two would fight
+    // over the same value for the first eighth of a second.
+    let following = prefersReducedMotion
+    let controls: ReturnType<typeof animate> | undefined
+    if (prefersReducedMotion) {
+      ringFill.set(0)
+    } else {
+      controls = animate(ringFill, 0, {
+        duration: RING_EMPTY_MS / 1000,
+        ease: "easeOut",
+        onComplete: () => {
+          following = true
+        },
+      })
+    }
+    const unsubscribe = progress?.on("change", (value) => {
+      if (following) ringFill.set(value)
+    })
+    return () => {
+      controls?.stop()
+      unsubscribe?.()
+    }
+  }, [isRecording, prefersReducedMotion, progress, ringFill])
 
   const handlePress = () => {
     playDigitalClick("strong")
     onPress()
   }
 
+  const radius = (geometry.size - geometry.ring) / 2
+  const label = ariaLabel ?? (isRecording ? "Stop recording" : "Capture frame")
+
   return (
     <button
       type="button"
       onClick={handlePress}
-      aria-label={ariaLabel}
+      aria-label={label}
       // Unpositioned, like CaptureThumbnail: the bar around it does the layout.
       className={cn(
-        "group flex items-center justify-center rounded-full border-shutter-ink bg-transparent shadow-none outline-none",
+        "group relative flex items-center justify-center rounded-full bg-transparent shadow-none outline-none",
+        "text-shutter-ink hoverFine:text-shutter-ink/90",
         "cursor-pointer transition-colors duration-150 ease-out motion-reduce:transition-none",
-        "hoverFine:border-shutter-ink/90 hoverFine:bg-transparent",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
         className,
       )}
-      style={{
-        width: geometry.size,
-        height: geometry.size,
-        borderWidth: geometry.ring,
-        borderStyle: "solid",
-        padding: geometry.gap,
-        ...style,
-      }}
+      style={{ width: geometry.size, height: geometry.size, ...style }}
     >
-      {/* Two timings on one element, which is why this is written out rather
-          than left to `transition-transform`: the press is 100ms because a
-          shutter should feel immediate, and the hover is 150ms to match the
-          other hover fades in the chrome. A single duration would have to be
-          wrong for one of them. */}
-      <span
-        className="block rounded-full bg-shutter-ink group-hoverFine:bg-shutter-ink/90 [transition:transform_100ms_ease-out,background-color_150ms_ease-out] group-active:scale-90 motion-reduce:transition-none"
-        style={{ width: geometry.fill, height: geometry.fill }}
+      {/* The ring, as two arcs rather than a CSS border, so one of them can be a
+          progress track. At rest the arc is a complete circle at full strength
+          over an invisible track, which is the border it replaced.
+          -90° puts zero at twelve o'clock; pathLength normalises the
+          circumference to 1 so the dash offset is just the fraction remaining,
+          with no 2πr in the component. */}
+      <svg
+        aria-hidden
+        className="absolute inset-0 -rotate-90"
+        viewBox={`0 0 ${geometry.size} ${geometry.size}`}
+        width={geometry.size}
+        height={geometry.size}
+        fill="none"
+      >
+        <motion.circle
+          cx={geometry.size / 2}
+          cy={geometry.size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={geometry.ring}
+          initial={false}
+          animate={{ opacity: isRecording ? TRACK_OPACITY : 0 }}
+          transition={prefersReducedMotion ? { duration: 0 } : { duration: RING_EMPTY_MS / 1000 }}
+        />
+        <motion.circle
+          cx={geometry.size / 2}
+          cy={geometry.size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={geometry.ring}
+          // Round caps leave a dot at twelve o'clock when the arc is empty,
+          // which reads as "started" rather than as nothing at all.
+          strokeLinecap="round"
+          pathLength={1}
+          strokeDasharray={1}
+          style={{ strokeDashoffset: dashOffset }}
+        />
+      </svg>
+
+      {/* Circle to rounded square, and the *box* is animated rather than a
+          scale — the SLOT_RADIUS lesson in lib/toolbar-geometry.ts: a scale
+          would paint the radius scaled too, so the corner would have to be
+          pre-compensated by a number nobody could explain later. Safe as layout
+          because the parent is a fixed box with flex centring, so nothing
+          outside this button can move.
+
+          The press affordance stays a CSS transform on the same element, which
+          does not collide: Framer is driving width, height and border-radius
+          here, not transform. */}
+      <motion.span
+        className="relative block bg-current group-active:scale-90 [transition:transform_100ms_ease-out] motion-reduce:transition-none"
+        initial={false}
+        animate={{
+          width: isRecording ? geometry.stop : geometry.fill,
+          height: isRecording ? geometry.stop : geometry.fill,
+          borderRadius: isRecording ? geometry.stopRadius : geometry.fill / 2,
+        }}
+        transition={prefersReducedMotion ? { duration: 0 } : spring.moderate}
       />
     </button>
   )

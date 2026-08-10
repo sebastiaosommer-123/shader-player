@@ -60,6 +60,35 @@ export async function encodeFullResolution(frozen: HTMLCanvasElement): Promise<s
   return blob ? URL.createObjectURL(blob) : null
 }
 
+/**
+ * The full-resolution encode, plus the decode that has to happen before anything
+ * swaps its `src` to the result.
+ *
+ * Without it the `<img>` goes blank for a frame while the browser reads a 7MB
+ * PNG — a hole where the picture was, a beat after the shutter. A failed decode
+ * resolves null, which leaves the caller on the preview it already had: still a
+ * correct picture, just a soft one.
+ *
+ * Both callers need this exact pair — the image capture upgrading its own
+ * artefact, and a recording upgrading its poster frame — so it lives here rather
+ * than twice in app/page.tsx.
+ */
+export async function encodeFullResolutionDecoded(
+  frozen: HTMLCanvasElement,
+): Promise<string | null> {
+  const full = await encodeFullResolution(frozen)
+  if (!full) return null
+  try {
+    const probe = new Image()
+    probe.src = full
+    await probe.decode()
+  } catch {
+    URL.revokeObjectURL(full)
+    return null
+  }
+  return full
+}
+
 /** Lowercase and hyphenated, so a display name is safe to put in a filename. */
 function slugify(value: string): string {
   return value

@@ -8,8 +8,9 @@ import { CaptureSlot } from "./capture-slot"
 import { ShutterButton } from "./shutter-button"
 import { ModeTabs, type CaptureMode } from "./mode-tabs"
 import { playDigitalClick } from "@/lib/audio-feedback"
-import { useReducedMotion } from "framer-motion"
+import { useReducedMotion, type MotionValue } from "framer-motion"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { cn } from "@/lib/utils"
 
 /** Matches the iOS camera proportions: round thumb, round control. The shutter
  *  owns its own geometry; see SHUTTER_SIZES in ShutterButton. */
@@ -33,6 +34,8 @@ interface MobileNavProps {
   /** Hidden entirely where MediaRecorder is unavailable; see app/page.tsx. */
   videoSupported: boolean
   captures: Capture[]
+  isRecording: boolean
+  recordingProgress: MotionValue<number>
   onThumbnailClick: (captureIndex: number) => void
   /** Passed straight through to the thumbnail; see CaptureThumbnail. */
   suppressMorph?: boolean
@@ -48,6 +51,8 @@ export function MobileNav({
   onModeChange,
   videoSupported,
   captures,
+  isRecording,
+  recordingProgress,
   onThumbnailClick,
   suppressMorph,
 }: MobileNavProps) {
@@ -91,6 +96,8 @@ export function MobileNav({
           <ShutterButton
             size="mobile"
             onPress={onCapture}
+            isRecording={isRecording}
+            progress={recordingProgress}
             className="transition-[opacity,transform]"
             style={hideWhileSheetOpen(150)}
           />
@@ -108,7 +115,12 @@ export function MobileNav({
                 was 0 wide for one paint, and `justify-between` started the tabs
                 22px left of centre before sliding them over. */}
             <div
-              className="relative z-10 shrink-0 transition-[opacity,transform]"
+              className={cn(
+                "relative z-10 shrink-0 transition-[opacity,transform]",
+                // See the matching note in FloatingToolbar: the gallery is
+                // unreachable mid-recording.
+                isRecording && "pointer-events-none",
+              )}
               style={{ ...hideWhileSheetOpen(180), width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}
             >
               {showThumbnail && (
@@ -138,6 +150,9 @@ export function MobileNav({
                   onModeChange={onModeChange}
                   layoutIdPrefix="mobile"
                   size="mobile"
+                  // Switching to Image mid-clip would freeze the canvas halfway
+                  // through the recording.
+                  disabled={isRecording}
                 />
               )}
             </div>

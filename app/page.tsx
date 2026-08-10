@@ -10,11 +10,13 @@ import { WallpaperGallery } from "@/components/wallpaper-gallery"
 import { GalleryCloseFlight, type CloseFlight } from "@/components/gallery-close-flight"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import type { Capture } from "@/lib/types"
-import { encodeFullResolution, freezeFrame, previewDataUrl } from "@/lib/canvas-capture"
+import { encodeFullResolutionDecoded, freezeFrame, previewDataUrl } from "@/lib/canvas-capture"
 import { warmPngEncoder } from "@/lib/png-encoder"
 import { CaptureDismissal } from "@/components/capture-dismissal"
 import type { CaptureMode } from "@/components/mode-tabs"
 import { isVideoCaptureSupported } from "@/lib/video-capture"
+import { useVideoRecorder } from "@/hooks/use-video-recorder"
+import { RecordingTimer } from "@/components/recording-timer"
 import { CaptureFlash } from "@/components/capture-flash"
 import { Toaster } from "@/components/ui/sonner"
 import { captureFlash } from "@/lib/springs"
@@ -106,13 +108,6 @@ export default function Home() {
     return () => window.clearTimeout(timer)
   }, [])
 
-  // Every reason the canvas stops, in one place, and reduced motion is not among
-  // them — it chose the mode above, and the mode is what speaks here.
-  //
-  // Image mode is frame rate zero by definition. The gallery is opaque over the
-  // canvas, so running the shader behind it is work nobody can see.
-  const isFrozen = isGalleryOpen || mode === "image"
-
   const handleShaderChange = (newShaderId: string) => {
     console.log("[v0] Changing shader to:", newShaderId)
     setShaderId(newShaderId)
@@ -120,10 +115,7 @@ export default function Home() {
     setParams(newConfig.defaultParams)
   }
 
-  const handleCapture = () => {
-    const canvas = shaderCanvasRef.current?.getCanvas()
-    if (!canvas) return
-
+  const captureImage = (canvas: HTMLCanvasElement) => {
     // Nothing on the click path may encode.
     //
     // The full-resolution PNG costs 70–94ms of main-thread work, and every
@@ -163,20 +155,92 @@ export default function Home() {
     // fired immediately because toBlob still has to hand the result back to this
     // thread, and the flash is the last thing that should be interrupted.
     window.setTimeout(async () => {
-      const full = await encodeFullResolution(frozen)
+      const full = await encodeFullResolutionDecoded(frozen)
       if (!full) return
-      // Decode before swapping the src, or the <img> goes blank for a frame
-      // while the browser reads a 7MB PNG. A failed decode just means we keep
-      // the preview, which is still a correct picture.
-      try {
-        const probe = new Image()
-        probe.src = full
-        await probe.decode()
-      } catch {
-        return
-      }
       setCaptures((prev) => prev.map((c) => (c.id === id ? { ...c, dataUrl: full } : c)))
     }, captureFlash.durationMs + 60)
+  }
+
+  /**
+   * Frame 0 of the recording in flight, held for as long as it runs.
+   *
+   * Frame 0 and not the last frame: the thumbnail, the gallery's morph target
+   * and the video's own first frame are then the same picture, so when the video
+   * fades in over the poster there is nothing to reconcile.
+   */
+  const posterFrameRef = useRef<HTMLCanvasElement | null>(null)
+
+  const recorder = useVideoRecorder({
+    onComplete: ({ url, mimeType, durationMs, width, height }) => {
+      const id = `${Date.now()}-${Math.random()}`
+      const frozen = posterFrameRef.current
+      posterFrameRef.current = null
+
+      setCaptures((prev) => [
+        ...prev,
+        {
+          id,
+          kind: "video",
+          dataUrl: url,
+          posterUrl: frozen ? previewDataUrl(frozen) : "",
+          mimeType,
+          durationMs,
+          timestamp: Date.now(),
+          width,
+          height,
+          params: { ...params },
+          shaderId,
+        },
+      ])
+
+      // The poster upgraded to full resolution, on the same delay and for the
+      // same reason as an image capture's: it is the picture the gallery morph
+      // carries to full screen, and a 128px preview held there for the length of
+      // a 450ms flight is visibly soft.
+      if (!frozen) return
+      window.setTimeout(async () => {
+        const full = await encodeFullResolutionDecoded(frozen)
+        if (!full) return
+        setCaptures((prev) => prev.map((c) => (c.id === id ? { ...c, posterUrl: full } : c)))
+      }, captureFlash.durationMs + 60)
+    },
+  })
+
+  // Every reason the canvas stops, in one place, and reduced motion is not among
+  // them — it chose the mode above, and the mode is what speaks here.
+  //
+  // **Recording wins over everything.** captureStream reads whatever the canvas
+  // last drew, so a stopped loop does not record a pause: it records fifteen
+  // seconds of one frame. The other two terms cannot arrive during a recording
+  // anyway — the mode control and the gallery thumbnail are both inert while one
+  // runs — but the precedence is written here rather than relied upon there.
+  //
+  // Image mode is frame rate zero by definition. The gallery is opaque over the
+  // canvas, so running the shader behind it is work nobody can see.
+  const isFrozen = recorder.isRecording ? false : isGalleryOpen || mode === "image"
+
+  /**
+   * One button, three jobs, decided here rather than in the shutter.
+   *
+   * No flash on the video path: a flash is a shutter event, and a recording does
+   * not have one — it has a ring and a timecode instead.
+   */
+  const handleShutterPress = () => {
+    const canvas = shaderCanvasRef.current?.getCanvas()
+    if (!canvas) return
+
+    if (mode === "image") {
+      captureImage(canvas)
+      return
+    }
+    if (recorder.isRecording) {
+      recorder.stop()
+      return
+    }
+    // Taken before the recorder starts, so the poster is the frame the recording
+    // opens on rather than one frame into it.
+    posterFrameRef.current = freezeFrame(canvas)
+    recorder.start(canvas)
   }
 
   const handleDeleteCapture = (id: string) => {
@@ -191,9 +255,16 @@ export default function Home() {
     // already holds its pixels as a texture, but a still-unfinished prepare
     // would be reading from this URL, and the outgoing <img> holds it for the
     // frame in which it unmounts.
-    if (doomed?.dataUrl.startsWith("blob:")) {
-      const url = doomed.dataUrl
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    //
+    // **Both** URLs. A video capture holds two: the recording, and the
+    // full-resolution poster that replaced its 128px preview. Revoking only
+    // dataUrl — which is all there was to revoke when every capture was a PNG —
+    // would leak a poster per recording for the life of the session.
+    const doomedUrls = [doomed?.dataUrl, doomed?.posterUrl].filter(
+      (url): url is string => !!url && url.startsWith("blob:"),
+    )
+    if (doomedUrls.length) {
+      window.setTimeout(() => doomedUrls.forEach((url) => URL.revokeObjectURL(url)), 1000)
     }
   }
 
@@ -266,6 +337,14 @@ export default function Home() {
               stays put. Being inside the clip also gets it the artwork's exact
               rounded corners for free. */}
           {flashKey > 0 && <CaptureFlash key={flashKey} isMobile={isMobile} />}
+          {/* The timecode, in the viewfinder rather than over the page — the same
+              rule the flash above follows, and where a camera puts it anyway.
+              Not in the recording; see RecordingTimer. */}
+          <AnimatePresence>
+            {recorder.isRecording && (
+              <RecordingTimer key="recording-timer" elapsedMs={recorder.elapsedMs} />
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -281,7 +360,9 @@ export default function Home() {
       </div>
 
       <MobileNav
-        onCapture={handleCapture}
+        onCapture={handleShutterPress}
+        isRecording={recorder.isRecording}
+        recordingProgress={recorder.progress}
         params={params}
         setParams={setParams}
         shaderId={shaderId}
@@ -303,7 +384,9 @@ export default function Home() {
         mode={mode}
         onModeChange={handleModeChange}
         videoSupported={videoSupported}
-        onCapture={handleCapture}
+        onCapture={handleShutterPress}
+        isRecording={recorder.isRecording}
+        recordingProgress={recorder.progress}
         captures={captures}
         onThumbnailClick={handleThumbnailClick}
         hasSlot={captures.length > 0}

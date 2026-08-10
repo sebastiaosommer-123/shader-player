@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, useReducedMotion } from "framer-motion"
+import { motion, useReducedMotion, type MotionValue } from "framer-motion"
 import type { Capture } from "@/lib/types"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Elevated } from "@/lib/elevated"
@@ -20,6 +20,8 @@ interface FloatingToolbarProps {
   /** Hidden entirely where MediaRecorder is unavailable; see app/page.tsx. */
   videoSupported: boolean
   onCapture: () => void
+  isRecording: boolean
+  recordingProgress: MotionValue<number>
   captures: Capture[]
   onThumbnailClick: (captureIndex: number) => void
   /** Whether to render the thumbnail slot at all — see app/page.tsx. */
@@ -44,6 +46,8 @@ export function FloatingToolbar({
   onModeChange,
   videoSupported,
   onCapture,
+  isRecording,
+  recordingProgress,
   captures,
   onThumbnailClick,
   hasSlot,
@@ -98,6 +102,11 @@ export function FloatingToolbar({
           // clip would crop that flat. Clipping only while shut, to keep a
           // zero-width slot from leaking anything over the tabs.
           hasSlot ? "overflow-visible" : "overflow-hidden",
+          // Opening the gallery mid-recording would leave the shader animating
+          // at full cost behind an opaque backdrop, recording something nobody
+          // can see. Inert rather than dimmed: the thumbnail is a picture, and
+          // fading it would read as the capture itself being unavailable.
+          isRecording && "pointer-events-none",
         )}
         // Animating layout properties rather than a transform, knowingly —
         // see the note above on why the width is the point. One 48px box on a
@@ -143,10 +152,21 @@ export function FloatingToolbar({
           side by side is a real legibility risk, and adjacency is what tells you
           which is which without either having to look different. */}
       {videoSupported && (
-        <ModeTabs mode={mode} onModeChange={onModeChange} layoutIdPrefix="desktop" />
+        <ModeTabs
+          mode={mode}
+          onModeChange={onModeChange}
+          layoutIdPrefix="desktop"
+          // Switching to Image mid-clip would freeze the canvas halfway through
+          // the recording.
+          disabled={isRecording}
+        />
       )}
 
-      <ShutterButton onPress={onCapture} />
+      <ShutterButton
+        onPress={onCapture}
+        isRecording={isRecording}
+        progress={recordingProgress}
+      />
     </Elevated>
   )
 }
