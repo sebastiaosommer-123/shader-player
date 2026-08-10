@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { ShaderParams } from "@/lib/shader-uniforms"
-import type { CapturedImage } from "@/lib/types"
+import type { Capture } from "@/lib/types"
 import { ControlsSheet } from "./controls-sheet"
 import { CaptureSlot } from "./capture-slot"
 import { ShaderTabs } from "./shader-tabs"
@@ -27,8 +27,8 @@ interface MobileNavProps {
   setParams: (params: ShaderParams) => void
   shaderId: string
   onShaderChange: (shaderId: string) => void
-  images: CapturedImage[]
-  onThumbnailClick: (imageIndex: number) => void
+  captures: Capture[]
+  onThumbnailClick: (captureIndex: number) => void
   /** Passed straight through to the thumbnail; see CaptureThumbnail. */
   suppressMorph?: boolean
 }
@@ -39,7 +39,7 @@ export function MobileNav({
   setParams,
   shaderId,
   onShaderChange,
-  images,
+  captures,
   onThumbnailClick,
   suppressMorph,
 }: MobileNavProps) {
@@ -56,12 +56,12 @@ export function MobileNav({
     transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
   })
 
-  const latestImage = images[images.length - 1]
-  const showThumbnail = isMobile && !!latestImage
+  const latest = captures[captures.length - 1]
+  const showThumbnail = isMobile && !!latest
 
   const handleThumbnailClick = () => {
-    const originalIndex = images.findIndex((img) => img.id === latestImage.id)
-    onThumbnailClick(originalIndex !== -1 ? originalIndex : images.length - 1)
+    const originalIndex = captures.findIndex((c) => c.id === latest.id)
+    onThumbnailClick(originalIndex !== -1 ? originalIndex : captures.length - 1)
   }
 
   return (
@@ -113,8 +113,8 @@ export function MobileNav({
             >
               {showThumbnail && (
                 <CaptureSlot
-                  image={latestImage}
-                  previous={images[images.length - 2]}
+                  capture={latest}
+                  previous={captures[captures.length - 2]}
                   width={THUMBNAIL_SIZE}
                   height={THUMBNAIL_SIZE}
                   radius={THUMBNAIL_RADIUS}

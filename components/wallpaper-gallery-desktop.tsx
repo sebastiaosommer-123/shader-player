@@ -5,7 +5,7 @@ import { motion, useIsPresent, useReducedMotion } from "framer-motion"
 import * as Dialog from "@radix-ui/react-dialog"
 import { X, Download, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { CapturedImage } from "@/lib/types"
+import { type Capture, stillUrl } from "@/lib/types"
 import type { CloseFlight } from "@/components/gallery-close-flight"
 import { downloadImage } from "@/lib/canvas-capture"
 import { playDigitalClick } from "@/lib/audio-feedback"
@@ -32,19 +32,19 @@ function normalizedWheelDelta(event: WheelEvent): number {
 }
 
 interface WallpaperGalleryProps {
-  images: CapturedImage[]
+  captures: Capture[]
   onClose: (flight?: CloseFlight) => void
   onDelete: (id: string) => void
   initialIndex?: number
-  openedImageId: string
+  openedCaptureId: string
 }
 
 export function WallpaperGalleryDesktop({
-  images,
+  captures,
   onClose,
   onDelete,
   initialIndex = 0,
-  openedImageId,
+  openedCaptureId,
 }: WallpaperGalleryProps) {
   // Captures are stored oldest to newest, but desktop presents them newest at
   // the top. Scrolling down therefore walks back through older captures. The
@@ -89,7 +89,7 @@ export function WallpaperGalleryDesktop({
    * `position: fixed` element resolves against. The 32px is md:inset-8 on the
    * viewer below, which is the only inset this component ever has.
    */
-  const shownImage = images[currentIndex]
+  const shownCapture = captures[currentIndex]
   const measureFitBox = useCallback(() => {
     const inset = window.matchMedia("(min-width: 768px)").matches ? 32 : 0
     // The filmstrip owns the rightmost 112px. Fit the capture into the actual
@@ -98,12 +98,12 @@ export function WallpaperGalleryDesktop({
     const boxHeight = Math.max(document.documentElement.clientHeight - inset * 2, 0)
     // A capture taken before the canvas was sized comes back 0×0; nothing sane
     // to fit, so let it have the whole box.
-    if (!shownImage?.width || !shownImage?.height) {
+    if (!shownCapture?.width || !shownCapture?.height) {
       return { width: boxWidth, height: boxHeight }
     }
-    const scale = Math.min(boxWidth / shownImage.width, boxHeight / shownImage.height)
-    return { width: shownImage.width * scale, height: shownImage.height * scale }
-  }, [shownImage])
+    const scale = Math.min(boxWidth / shownCapture.width, boxHeight / shownCapture.height)
+    return { width: shownCapture.width * scale, height: shownCapture.height * scale }
+  }, [shownCapture])
 
   const [fitBox, setFitBox] = useState(measureFitBox)
 
@@ -123,16 +123,16 @@ export function WallpaperGalleryDesktop({
   const isPresent = useIsPresent()
 
   useEffect(() => {
-    if (currentIndex >= images.length && images.length > 0) {
-      const nextIndex = images.length - 1
+    if (currentIndex >= captures.length && captures.length > 0) {
+      const nextIndex = captures.length - 1
       currentIndexRef.current = nextIndex
       setCurrentIndex(nextIndex)
-    } else if (images.length === 0) {
+    } else if (captures.length === 0) {
       onClose()
     }
-  }, [images.length, currentIndex, onClose])
+  }, [captures.length, currentIndex, onClose])
 
-  const navigateToImage = useCallback((nextIndex: number, withSound: boolean) => {
+  const navigateToCapture = useCallback((nextIndex: number, withSound: boolean) => {
     if (nextIndex === currentIndexRef.current) return
     if (withSound) playDigitalClick("strong")
 
@@ -140,8 +140,8 @@ export function WallpaperGalleryDesktop({
     setCurrentIndex(nextIndex)
   }, [])
 
-  const handleSelectImage = (nextIndex: number) => {
-    navigateToImage(nextIndex, true)
+  const handleSelectCapture = (nextIndex: number) => {
+    navigateToCapture(nextIndex, true)
   }
 
   useEffect(() => {
@@ -175,21 +175,21 @@ export function WallpaperGalleryDesktop({
       const direction = wheelDeltaRef.current > 0 ? 1 : -1
       const nextIndex = Math.max(
         0,
-        Math.min(currentIndexRef.current - direction, images.length - 1),
+        Math.min(currentIndexRef.current - direction, captures.length - 1),
       )
       wheelDeltaRef.current = 0
       if (nextIndex === currentIndexRef.current) return
 
       lastWheelStepRef.current = now
-      navigateToImage(nextIndex, false)
+      navigateToCapture(nextIndex, false)
     }
 
     window.addEventListener("wheel", handleWheel, { passive: false, capture: true })
     return () => window.removeEventListener("wheel", handleWheel, { capture: true })
-  }, [images.length, navigateToImage])
+  }, [captures.length, navigateToCapture])
 
-  const currentImage = images[currentIndex]
-  if (!currentImage) return null
+  const currentCapture = captures[currentIndex]
+  if (!currentCapture) return null
 
   /**
    * The download, on the press.
@@ -205,9 +205,9 @@ export function WallpaperGalleryDesktop({
    * also survives being missed, which is the whole job here.
    */
   const handleDownload = () => {
-    if (!currentImage) return
+    if (!currentCapture) return
     playDigitalClick("strong")
-    downloadImage(currentImage.dataUrl, currentImage.timestamp, currentImage.shaderId)
+    downloadImage(currentCapture.dataUrl, currentCapture.timestamp, currentCapture.shaderId)
     playDownloadConfirmation("strong")
     toast.success("Image downloaded")
   }
@@ -231,16 +231,16 @@ export function WallpaperGalleryDesktop({
    * comes in from the right and the strip steps forward for once.
    */
   const handleDelete = () => {
-    if (!currentImage) return
+    if (!currentCapture) return
     playDigitalClick("strong")
 
-    const src = currentImage.dataUrl
+    const src = stillUrl(currentCapture)
     // Both read before the removal, while this capture is still the one painted.
     const rect = prefersReducedMotion ? undefined : captureRef.current?.getBoundingClientRect()
-    const wasLast = images.length === 1
+    const wasLast = captures.length === 1
     const stepsBack = currentIndex > 0
 
-    onDelete(currentImage.id)
+    onDelete(currentCapture.id)
     dismissCapture(src, rect, wasLast)
 
     // Nothing to step to: the list is empty and the effect above is already
@@ -262,8 +262,8 @@ export function WallpaperGalleryDesktop({
     // which is the one the thumbnail is showing. Step away with the arrows and
     // the morph home would be collapsing the wrong photograph — so the page
     // draws this one's collapse instead.
-    const strayed = currentImage.id !== openedImageId && !prefersReducedMotion
-    onClose(strayed ? closeFlightFrom(captureRef.current, currentImage) : undefined)
+    const strayed = currentCapture.id !== openedCaptureId && !prefersReducedMotion
+    onClose(strayed ? closeFlightFrom(captureRef.current, currentCapture) : undefined)
   }
 
   const reducedTransition = { duration: 0.15, ease: "easeInOut" as const }
@@ -338,7 +338,7 @@ export function WallpaperGalleryDesktop({
           className="fixed inset-0 overflow-hidden md:inset-8"
           onClick={handleClose}
         >
-          {currentImage && (
+          {currentCapture && (
             // A delete's arrival rides on this wrapper instead of the image.
             // The image is a projection node, so Framer owns its transform for
             // the length of the gallery morph; a second transform on the same
@@ -366,18 +366,18 @@ export function WallpaperGalleryDesktop({
                     morph — driven by the shared element mounting and unmounting —
                     is untouched. */}
                 <motion.div
-                  layoutId={`gallery-container-${openedImageId}`}
-                  layoutDependency={openedImageId}
+                  layoutId={`gallery-container-${openedCaptureId}`}
+                  layoutDependency={openedCaptureId}
                   className="relative overflow-hidden"
                   style={{ borderRadius: 0, width: fitBox.width, height: fitBox.height }}
                   transition={morphTransition}
                 >
                   <motion.img
                     ref={captureRef}
-                    layoutId={`gallery-image-${openedImageId}`}
-                    layoutDependency={openedImageId}
+                    layoutId={`gallery-image-${openedCaptureId}`}
+                    layoutDependency={openedCaptureId}
                     transition={morphTransition}
-                    src={currentImage.dataUrl || "/placeholder.svg"}
+                    src={stillUrl(currentCapture) || "/placeholder.svg"}
                     alt={`Captured frame ${currentIndex + 1}`}
                     className="block"
                     style={{ width: fitBox.width, height: fitBox.height }}
@@ -403,18 +403,18 @@ export function WallpaperGalleryDesktop({
             : { duration: 0.18, delay: 0.3, ease: "easeOut" }
         }
       >
-        {images.length > 0 && (
+        {captures.length > 0 && (
           <div className="absolute bottom-20 right-0 top-20">
             <GalleryThumbnailStrip
-              images={images}
+              captures={captures}
               currentIndex={currentIndex}
-              onSelect={handleSelectImage}
+              onSelect={handleSelectCapture}
               orientation="vertical"
             />
           </div>
         )}
 
-        {images.length > 0 && (
+        {captures.length > 0 && (
           <Button
             ref={closeButtonRef}
             onClick={(e) => { e.stopPropagation(); handleClose() }}
@@ -427,9 +427,9 @@ export function WallpaperGalleryDesktop({
           </Button>
         )}
 
-        {currentImage && (
+        {currentCapture && (
           <>
-            {images.length > 0 && (
+            {captures.length > 0 && (
               <div className="absolute top-4 left-4 flex gap-2">
                 <Button
                   onClick={(e) => { e.stopPropagation(); handleDelete() }}

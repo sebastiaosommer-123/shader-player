@@ -9,7 +9,7 @@ import { FloatingToolbar } from "@/components/floating-toolbar"
 import { WallpaperGallery } from "@/components/wallpaper-gallery"
 import { GalleryCloseFlight, type CloseFlight } from "@/components/gallery-close-flight"
 import type { ShaderParams } from "@/lib/shader-uniforms"
-import type { CapturedImage } from "@/lib/types"
+import type { Capture } from "@/lib/types"
 import { encodeFullResolution, freezeFrame, previewDataUrl } from "@/lib/canvas-capture"
 import { warmPngEncoder } from "@/lib/png-encoder"
 import { CaptureDismissal } from "@/components/capture-dismissal"
@@ -29,10 +29,10 @@ export default function Home() {
   const { isResizing, startResize } = useResizableSidebar()
   const [params, setParams] = useState<ShaderParams>(getShaderConfig("terracotta").defaultParams)
 
-  const [capturedImages, setCapturedImages] = useState<CapturedImage[]>([])
+  const [captures, setCaptures] = useState<Capture[]>([])
   const [isGalleryOpen, setIsGalleryOpen] = useState(false)
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-  const [clickedImageId, setClickedImageId] = useState<string | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [clickedCaptureId, setClickedCaptureId] = useState<string | null>(null)
   // Set when the gallery is dismissed from a capture other than the one it was
   // opened on, which is the one the thumbnail is showing. The shared-element
   // morph cannot draw that — see GalleryCloseFlight — so it is stood down for as
@@ -86,10 +86,11 @@ export default function Home() {
     if (!frozen) return
 
     const id = `${Date.now()}-${Math.random()}`
-    setCapturedImages((prev) => [
+    setCaptures((prev) => [
       ...prev,
       {
         id,
+        kind: "image",
         dataUrl: previewDataUrl(frozen),
         timestamp: Date.now(),
         // The frozen frame's real dimensions, not the preview's. The thumbnail's
@@ -119,15 +120,15 @@ export default function Home() {
       } catch {
         return
       }
-      setCapturedImages((prev) => prev.map((img) => (img.id === id ? { ...img, dataUrl: full } : img)))
+      setCaptures((prev) => prev.map((c) => (c.id === id ? { ...c, dataUrl: full } : c)))
     }, captureFlash.durationMs + 60)
   }
 
-  const handleDeleteImage = (id: string) => {
+  const handleDeleteCapture = (id: string) => {
     // Nothing left to show closes the desktop slot again, which falls out of
     // hasSlot below rather than needing its own flag.
-    const doomed = capturedImages.find((img) => img.id === id)
-    setCapturedImages(capturedImages.filter((img) => img.id !== id))
+    const doomed = captures.find((c) => c.id === id)
+    setCaptures(captures.filter((c) => c.id !== id))
 
     // The full-resolution capture is a blob the browser keeps alive until its
     // URL is revoked. On a delay because this now fires on the press frame,
@@ -152,14 +153,14 @@ export default function Home() {
   // The galleries lay their captures out in the order they were taken, so the
   // index the toolbar hands us is already the one they want — no flip on the
   // way in. See the ordering note in either gallery for why that direction.
-  const handleThumbnailClick = (imageIndex: number) => {
-    const clickedImage = capturedImages[imageIndex]
-    if (!clickedImage) return
+  const handleThumbnailClick = (captureIndex: number) => {
+    const clicked = captures[captureIndex]
+    if (!clicked) return
     // Opening again before the last close has landed: drop the flight so the
     // thumbnail is back in the layoutId stack for the morph it is about to lead.
     setCloseFlight(null)
-    setClickedImageId(clickedImage.id)
-    setSelectedImageIndex(imageIndex)
+    setClickedCaptureId(clicked.id)
+    setSelectedIndex(captureIndex)
     setIsGalleryOpen(true)
   }
 
@@ -230,7 +231,7 @@ export default function Home() {
         setParams={setParams}
         shaderId={shaderId}
         onShaderChange={handleShaderChange}
-        images={capturedImages}
+        captures={captures}
         onThumbnailClick={handleThumbnailClick}
         suppressMorph={!!closeFlight}
       />
@@ -242,21 +243,21 @@ export default function Home() {
         shaderId={shaderId}
         onShaderChange={handleShaderChange}
         onCapture={handleCapture}
-        images={capturedImages}
+        captures={captures}
         onThumbnailClick={handleThumbnailClick}
-        hasSlot={capturedImages.length > 0}
+        hasSlot={captures.length > 0}
         suppressMorph={!!closeFlight}
       />
 
       <AnimatePresence>
-        {isGalleryOpen && clickedImageId && (
+        {isGalleryOpen && clickedCaptureId && (
           <WallpaperGallery
             key="gallery"
-            images={capturedImages}
+            captures={captures}
             onClose={handleGalleryClose}
-            onDelete={handleDeleteImage}
-            initialIndex={selectedImageIndex}
-            openedImageId={clickedImageId}
+            onDelete={handleDeleteCapture}
+            initialIndex={selectedIndex}
+            openedCaptureId={clickedCaptureId}
             isMobile={isMobile}
           />
         )}
@@ -292,7 +293,7 @@ export default function Home() {
           lands, and its root drops below the control bars on the close frame. */}
       {closeFlight && (
         <GalleryCloseFlight
-          key={closeFlight.image.id}
+          key={closeFlight.capture.id}
           flight={closeFlight}
           onComplete={() => setCloseFlight(null)}
         />

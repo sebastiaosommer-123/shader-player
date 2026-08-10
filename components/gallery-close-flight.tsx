@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react"
 import { animate, motion, useMotionValue, useTransform } from "framer-motion"
-import type { CapturedImage } from "@/lib/types"
+import { type Capture, stillUrl } from "@/lib/types"
 import { coverBox } from "@/components/capture-thumbnail"
 import { galleryMorph } from "@/lib/springs"
 
@@ -23,7 +23,7 @@ const FADE_COMPLETE_AT = 0.6
 const MORPH_FALLBACK_MS = Math.round(galleryMorph.duration * 1000) + 150
 
 export interface CloseFlight {
-  image: CapturedImage
+  capture: Capture
   /** Where the capture was painted when the gallery was dismissed. */
   rect: { top: number; left: number; width: number; height: number }
 }
@@ -37,12 +37,12 @@ export interface CloseFlight {
  */
 export function closeFlightFrom(
   node: HTMLElement | null,
-  image: CapturedImage | undefined,
+  capture: Capture | undefined,
 ): CloseFlight | undefined {
-  if (!node || !image) return undefined
+  if (!node || !capture) return undefined
   const box = node.getBoundingClientRect()
   if (!box.width || !box.height) return undefined
-  return { image, rect: { top: box.top, left: box.left, width: box.width, height: box.height } }
+  return { capture, rect: { top: box.top, left: box.left, width: box.width, height: box.height } }
 }
 
 interface GalleryCloseFlightProps {
@@ -77,7 +77,7 @@ interface GalleryCloseFlightProps {
  * behind it on arrival.
  */
 export function GalleryCloseFlight({ flight, onComplete }: GalleryCloseFlightProps) {
-  const { image, rect } = flight
+  const { capture, rect } = flight
 
   // The thumbnail's box as painted, and the flip onto it.
   //
@@ -143,7 +143,7 @@ export function GalleryCloseFlight({ flight, onComplete }: GalleryCloseFlightPro
   // across, and what changes is how much of it you are allowed to see.
   const box = landing ?? { ...rect, radius: 0 }
   const picture = landing
-    ? coverBox(image, landing.width, landing.height)
+    ? coverBox(capture, landing.width, landing.height)
     : { width: rect.width, height: rect.height }
 
   return (
@@ -168,7 +168,7 @@ export function GalleryCloseFlight({ flight, onComplete }: GalleryCloseFlightPro
         <motion.img
           layout
           transition={galleryMorph}
-          src={image.dataUrl || "/placeholder.svg"}
+          src={stillUrl(capture) || "/placeholder.svg"}
           alt=""
           className="max-w-none shrink-0"
           style={{ width: picture.width, height: picture.height }}

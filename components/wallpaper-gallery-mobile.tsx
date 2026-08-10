@@ -6,7 +6,7 @@ import * as Dialog from "@radix-ui/react-dialog"
 import { X, Download, Trash2 } from "lucide-react"
 import { BlossomCarousel, type BlossomCarouselHandle } from "@blossom-carousel/react"
 import { Button } from "@/components/ui/button"
-import type { CapturedImage } from "@/lib/types"
+import { type Capture, stillUrl } from "@/lib/types"
 import type { CloseFlight } from "@/components/gallery-close-flight"
 import { closeFlightFrom } from "@/components/gallery-close-flight"
 import { downloadImage } from "@/lib/canvas-capture"
@@ -26,19 +26,19 @@ const galleryButtonClass =
 const MORPH_FALLBACK_MS = Math.round(galleryMorph.duration * 1000) + 100
 
 interface WallpaperGalleryProps {
-  images: CapturedImage[]
+  captures: Capture[]
   onClose: (flight?: CloseFlight) => void
   onDelete: (id: string) => void
   initialIndex?: number
-  openedImageId: string
+  openedCaptureId: string
 }
 
 export function WallpaperGalleryMobile({
-  images,
+  captures,
   onClose,
   onDelete,
   initialIndex = 0,
-  openedImageId,
+  openedCaptureId,
 }: WallpaperGalleryProps) {
   // Oldest to newest, left to right, so the capture you just took sits at the
   // right-hand end and you swipe rightwards to walk back through the older
@@ -46,7 +46,7 @@ export function WallpaperGalleryMobile({
   // carousel is not a list: it is a strip of film, and on a strip of film time
   // runs one way. Photos, Camera Roll and every scrubber you have ever used
   // agree on which. The toolbar hands the index down already in this order.
-  const imageCount = images.length
+  const captureCount = captures.length
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [imageVisible, setImageVisible] = useState(true)
@@ -96,18 +96,18 @@ export function WallpaperGalleryMobile({
    * are different numbers whenever the address bar is part-way through
    * collapsing.
    */
-  const openedImage = images.find((image) => image.id === openedImageId)
+  const openedCapture = captures.find((c) => c.id === openedCaptureId)
   const measureFitBox = useCallback(() => {
     const viewportWidth = document.documentElement.clientWidth
     const viewportHeight = document.documentElement.clientHeight
     // A capture taken before the canvas was sized comes back 0×0; nothing sane
     // to fit, so let it have the whole viewport.
-    if (!openedImage?.width || !openedImage?.height) {
+    if (!openedCapture?.width || !openedCapture?.height) {
       return { width: viewportWidth, height: viewportHeight }
     }
-    const scale = Math.min(viewportWidth / openedImage.width, viewportHeight / openedImage.height)
-    return { width: openedImage.width * scale, height: openedImage.height * scale }
-  }, [openedImage])
+    const scale = Math.min(viewportWidth / openedCapture.width, viewportHeight / openedCapture.height)
+    return { width: openedCapture.width * scale, height: openedCapture.height * scale }
+  }, [openedCapture])
 
   const [fitBox, setFitBox] = useState(measureFitBox)
 
@@ -168,12 +168,12 @@ export function WallpaperGalleryMobile({
   useEffect(() => () => cancelAnimationFrame(scrollFrameRef.current), [])
 
   useEffect(() => {
-    if (currentIndex >= imageCount && imageCount > 0) {
-      setCurrentIndex(imageCount - 1)
-    } else if (imageCount === 0) {
+    if (currentIndex >= captureCount && captureCount > 0) {
+      setCurrentIndex(captureCount - 1)
+    } else if (captureCount === 0) {
       onClose()
     }
-  }, [imageCount, currentIndex, onClose])
+  }, [captureCount, currentIndex, onClose])
 
   // A deletion pulls a slide out of the row from under the scroll offset, which
   // would otherwise leave the next capture sitting half off screen.
@@ -184,9 +184,9 @@ export function WallpaperGalleryMobile({
   // frame and the capture that was just deleted flashes back into view under its
   // own exit.
   useLayoutEffect(() => {
-    if (imageCount === 0) return
-    scrollToIndex(Math.min(currentIndexRef.current, imageCount - 1), false)
-  }, [imageCount, scrollToIndex])
+    if (captureCount === 0) return
+    scrollToIndex(Math.min(currentIndexRef.current, captureCount - 1), false)
+  }, [captureCount, scrollToIndex])
 
   // onLayoutAnimationComplete normally beats this; it is here so a morph that
   // never reports back cannot leave the parallax switched off for good.
@@ -199,10 +199,10 @@ export function WallpaperGalleryMobile({
     return () => clearTimeout(timer)
   }, [prefersReducedMotion])
 
-  const currentImage = images[currentIndex]
-  if (!currentImage) return null
+  const currentCapture = captures[currentIndex]
+  if (!currentCapture) return null
 
-  const handleSelectImage = (index: number) => {
+  const handleSelectCapture = (index: number) => {
     if (index === currentIndex) return
     playDigitalClick("strong")
     scrollToIndex(index, !prefersReducedMotion)
@@ -222,9 +222,9 @@ export function WallpaperGalleryMobile({
    * also survives being missed, which is the whole job here.
    */
   const handleDownload = () => {
-    if (!currentImage) return
+    if (!currentCapture) return
     playDigitalClick("strong")
-    downloadImage(currentImage.dataUrl, currentImage.timestamp, currentImage.shaderId)
+    downloadImage(currentCapture.dataUrl, currentCapture.timestamp, currentCapture.shaderId)
     playDownloadConfirmation("strong")
     toast.success("Image downloaded")
   }
@@ -253,16 +253,16 @@ export function WallpaperGalleryMobile({
    * of it is painted.
    */
   const handleDelete = () => {
-    if (!currentImage) return
+    if (!currentCapture) return
     playDigitalClick("strong")
 
-    const src = currentImage.dataUrl
+    const src = stillUrl(currentCapture)
     // Both read before the removal, while this capture is still the one painted.
     const rect = prefersReducedMotion ? undefined : captureRef.current?.getBoundingClientRect()
-    const wasLast = imageCount === 1
+    const wasLast = captureCount === 1
     const stepsBack = currentIndex > 0
 
-    onDelete(currentImage.id)
+    onDelete(currentCapture.id)
     dismissCapture(src, rect, wasLast)
 
     // Nothing to step to: the list is empty and the effect above is already
@@ -282,8 +282,8 @@ export function WallpaperGalleryMobile({
     // that slide is off screen the moment you swipe away from it — the morph
     // home would fly from a rect nobody can see. So the page draws the collapse
     // of the capture actually in front of you instead.
-    const strayed = currentImage.id !== openedImageId && !prefersReducedMotion
-    const flight = strayed ? closeFlightFrom(captureRef.current, currentImage) : undefined
+    const strayed = currentCapture.id !== openedCaptureId && !prefersReducedMotion
+    const flight = strayed ? closeFlightFrom(captureRef.current, currentCapture) : undefined
     // Hand the transform back to Framer before the collapse starts, so a gallery
     // closed mid-swipe still morphs from where the capture actually sits.
     setIsMorphing(true)
@@ -393,9 +393,9 @@ export function WallpaperGalleryMobile({
               onScroll={handleScroll}
               aria-label="Captured frames"
             >
-              {images.map((image, index) => (
+              {captures.map((capture, index) => (
                 <div
-                  key={image.id}
+                  key={capture.id}
                   data-blossom-slide
                   ref={index === initialIndex ? seedScroll : undefined}
                   className="gallery-slide"
@@ -446,9 +446,9 @@ export function WallpaperGalleryMobile({
                           end, and the card clips it. The capture fills the
                           aperture the entire way across; what changes is how much
                           of it you are allowed to see. */}
-                      {image.id === openedImageId ? (
+                      {capture.id === openedCaptureId ? (
                         <motion.div
-                          layoutId={`gallery-container-${openedImageId}`}
+                          layoutId={`gallery-container-${openedCaptureId}`}
                           className="relative overflow-hidden"
                           style={{ borderRadius: 0, width: fitBox.width, height: fitBox.height }}
                           transition={morphTransition}
@@ -456,10 +456,10 @@ export function WallpaperGalleryMobile({
                         >
                           <motion.img
                             ref={index === currentIndex ? setCaptureNode : undefined}
-                            layoutId={`gallery-image-${openedImageId}`}
+                            layoutId={`gallery-image-${openedCaptureId}`}
                             transition={morphTransition}
-                            src={image.dataUrl || "/placeholder.svg"}
-                            alt={`Captured frame ${index + 1} of ${imageCount}`}
+                            src={stillUrl(capture) || "/placeholder.svg"}
+                            alt={`Captured frame ${index + 1} of ${captureCount}`}
                             className="block"
                             style={{ width: fitBox.width, height: fitBox.height }}
                             draggable={false}
@@ -469,8 +469,8 @@ export function WallpaperGalleryMobile({
                       ) : (
                         <img
                           ref={index === currentIndex ? setCaptureNode : undefined}
-                          src={image.dataUrl || "/placeholder.svg"}
-                          alt={`Captured frame ${index + 1} of ${imageCount}`}
+                          src={stillUrl(capture) || "/placeholder.svg"}
+                          alt={`Captured frame ${index + 1} of ${captureCount}`}
                           className="max-h-full max-w-full"
                           draggable={false}
                           onClick={(e) => e.stopPropagation()}
@@ -498,18 +498,18 @@ export function WallpaperGalleryMobile({
             : { duration: 0.18, delay: 0.3, ease: "easeOut" }
         }
       >
-        {imageCount > 0 && (
+        {captureCount > 0 && (
           <div className="absolute inset-x-0 bottom-0">
             <GalleryThumbnailStrip
-              images={images}
+              captures={captures}
               currentIndex={currentIndex}
-              onSelect={handleSelectImage}
+              onSelect={handleSelectCapture}
               orientation="horizontal"
             />
           </div>
         )}
 
-        {imageCount > 0 && (
+        {captureCount > 0 && (
           <Button
             ref={closeButtonRef}
             onClick={(e) => { e.stopPropagation(); handleClose() }}
@@ -522,7 +522,7 @@ export function WallpaperGalleryMobile({
           </Button>
         )}
 
-        {currentImage && (
+        {currentCapture && (
           <>
             {/* No prev/next arrows here, deliberately. Paging is the swipe — the
                 carousel is a real scroll container, so the finger is already the
@@ -530,7 +530,7 @@ export function WallpaperGalleryMobile({
                 A pair of chevrons pinned over the middle of the capture only
                 covered the thing being looked at. Desktop has none either; it
                 pages with the wheel, the arrow keys and its own rail. */}
-            {imageCount > 0 && (
+            {captureCount > 0 && (
               <div className="absolute top-4 left-4 flex gap-2">
                 <Button
                   onClick={(e) => { e.stopPropagation(); handleDelete() }}

@@ -2,7 +2,7 @@
 
 import { useRef } from "react"
 import { motion, useReducedMotion } from "framer-motion"
-import type { CapturedImage } from "@/lib/types"
+import { type Capture, stillUrl } from "@/lib/types"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { captureFlash, galleryMorph, spring } from "@/lib/springs"
 
@@ -29,8 +29,8 @@ export const THUMBNAIL_RADIUS = 8
  * Shared with the outgoing layer in CaptureSlot, which has to frame its picture
  * identically or the swap would visibly re-crop.
  */
-export function coverBox(image: CapturedImage, width: number, height: number) {
-  const ratio = image.width / image.height
+export function coverBox(capture: Capture, width: number, height: number) {
+  const ratio = capture.width / capture.height
   const aspect = Number.isFinite(ratio) && ratio > 0 ? ratio : width / height
   const isWider = aspect > width / height
   return {
@@ -40,7 +40,7 @@ export function coverBox(image: CapturedImage, width: number, height: number) {
 }
 
 interface CaptureThumbnailProps {
-  image: CapturedImage
+  capture: Capture
   width: number
   height: number
   onClick: () => void
@@ -95,7 +95,7 @@ interface CaptureThumbnailProps {
  * a time, since two elements sharing a layoutId would break the gallery morph.
  */
 export function CaptureThumbnail({
-  image,
+  capture,
   width,
   height,
   onClick,
@@ -145,7 +145,7 @@ export function CaptureThumbnail({
   const transition = prefersReducedMotion ? { duration: 0 } : galleryMorph
   const morphs = !prefersReducedMotion && !suppressMorph
 
-  const cover = coverBox(image, width, height)
+  const cover = coverBox(capture, width, height)
 
   return (
     // The arrival, one layer further out again, and for the mirror of the
@@ -202,7 +202,7 @@ export function CaptureThumbnail({
       >
         <motion.button
           type="button"
-          layoutId={morphs ? `gallery-container-${image.id}` : undefined}
+          layoutId={morphs ? `gallery-container-${capture.id}` : undefined}
           // What GalleryCloseFlight measures its landing box off. On the
           // thumbnail's own element rather than the slot around it, because this
           // is the box the morph lands on: the radius and the clip are both
@@ -228,9 +228,9 @@ export function CaptureThumbnail({
                 stretched by however unevenly the box grows — and a circle reaching a
                 landscape viewport grows very unevenly indeed. */}
             <motion.img
-              layoutId={morphs ? `gallery-image-${image.id}` : undefined}
+              layoutId={morphs ? `gallery-image-${capture.id}` : undefined}
               transition={transition}
-              src={image.dataUrl || "/placeholder.svg"}
+              src={stillUrl(capture) || "/placeholder.svg"}
               alt="Latest capture"
               className="max-w-none shrink-0"
               style={{ width: cover.width, height: cover.height }}

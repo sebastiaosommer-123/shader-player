@@ -11,11 +11,11 @@ import {
   type MotionValue,
   type Transition,
 } from "framer-motion"
-import type { CapturedImage } from "@/lib/types"
+import { type Capture, stillUrl } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 interface GalleryThumbnailStripProps {
-  images: CapturedImage[]
+  captures: Capture[]
   currentIndex: number
   onSelect: (index: number) => void
   orientation: "horizontal" | "vertical"
@@ -169,7 +169,7 @@ const IDENTITY_TRANSFORM = "translate3d(0, 0px, 0) scale(1)"
  * per frame, and React sits it out entirely.
  */
 export function GalleryThumbnailStrip({
-  images,
+  captures,
   currentIndex,
   onSelect,
   orientation,
@@ -179,12 +179,12 @@ export function GalleryThumbnailStrip({
   const valueRefs = useRef<(FrameValues | null)[]>([])
   const selectionTransition = prefersReducedMotion ? { duration: 0 } : SELECTION_SPRING
   const isVertical = orientation === "vertical"
-  const displayedImages = isVertical ? [...images].reverse() : images
+  const displayedCaptures = isVertical ? [...captures].reverse() : captures
 
   // Registries are keyed by *display* index — the rail's own top-to-bottom
   // order, which is reversed on desktop so the newest capture sits at the top.
-  const displayIndexOf = (imageIndex: number) =>
-    isVertical ? images.length - 1 - imageIndex : imageIndex
+  const displayIndexOf = (captureIndex: number) =>
+    isVertical ? captures.length - 1 - captureIndex : captureIndex
 
   /**
    * The frames, in display order, read straight out of the DOM.
@@ -522,10 +522,10 @@ export function GalleryThumbnailStrip({
     if (!isVertical || prefersReducedMotion) return
     // A delete leaves the value registry longer than the strip. Positions are
     // keyed by display index, so trimming is all the compaction it needs.
-    valueRefs.current.length = images.length
+    valueRefs.current.length = captures.length
     measure()
     applyField()
-  }, [applyField, images.length, isVertical, measure, prefersReducedMotion])
+  }, [applyField, captures.length, isVertical, measure, prefersReducedMotion])
 
   // And again once the frames have re-registered their motion values, which they
   // do in an effect and therefore after the layout pass above. A delete renumbers
@@ -535,7 +535,7 @@ export function GalleryThumbnailStrip({
   useEffect(() => {
     if (!isVertical || prefersReducedMotion) return
     applyField()
-  }, [applyField, images.length, isVertical, prefersReducedMotion])
+  }, [applyField, captures.length, isVertical, prefersReducedMotion])
 
   useEffect(() => {
     const nav = scrollRef.current
@@ -632,8 +632,8 @@ export function GalleryThumbnailStrip({
       // ring, so there is no travel to draw — the frame it is on has simply been
       // relabelled. Springing across that renumbering would send it on a lap of
       // the rail on every delete.
-      if (selectionCountRef.current !== images.length) {
-        selectionCountRef.current = images.length
+      if (selectionCountRef.current !== captures.length) {
+        selectionCountRef.current = captures.length
         selectionAnimation.current?.stop()
         selectionAnimation.current = null
         selection.jump(target)
@@ -684,14 +684,14 @@ export function GalleryThumbnailStrip({
       if (scrollAnimation.current === controls) scrollAnimation.current = null
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, images.length, orientation, prefersReducedMotion, scrollAxis, stopScroll])
+  }, [currentIndex, captures.length, orientation, prefersReducedMotion, scrollAxis, stopScroll])
 
   const ridesOwnRing = isVertical && !prefersReducedMotion
 
   return (
     <nav
       ref={scrollRef}
-      aria-label="Captured images"
+      aria-label="Captures"
       data-gallery-thumbnail-strip={orientation}
       className={cn(
         "pointer-events-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -740,27 +740,27 @@ export function GalleryThumbnailStrip({
             : "w-max min-w-full items-center justify-center gap-0 px-1",
         )}
       >
-        {displayedImages.map((image, displayIndex) => {
-          const imageIndex = isVertical ? images.length - 1 - displayIndex : displayIndex
+        {displayedCaptures.map((capture, displayIndex) => {
+          const captureIndex = isVertical ? captures.length - 1 - displayIndex : displayIndex
 
           return (
             <GalleryThumbnailFrame
-              key={image.id}
-              image={image}
+              key={capture.id}
+              capture={capture}
               displayIndex={displayIndex}
-              label={`Show captured image ${imageIndex + 1} of ${images.length}`}
-              selected={imageIndex === currentIndex}
+              label={`Show capture ${captureIndex + 1} of ${captures.length}`}
+              selected={captureIndex === currentIndex}
               isVertical={isVertical}
               orientation={orientation}
               prefersReducedMotion={Boolean(prefersReducedMotion)}
               selectionTransition={selectionTransition}
               registerValues={registerValues}
-              onSelect={() => onSelect(imageIndex)}
+              onSelect={() => onSelect(captureIndex)}
               // On the press, not the click: keyboard activation fires `click`
               // without a `pointerdown`, so Enter on a focused frame keeps the
               // scroll that puts it in view.
               onPressFrame={() => {
-                pointerSelectRef.current = imageIndex
+                pointerSelectRef.current = captureIndex
               }}
               onFocusFrame={focusField}
               onBlurFrame={blurField}
@@ -783,7 +783,7 @@ export function GalleryThumbnailStrip({
           Absolutely positioned inside the scroller, so it rides the rail's
           scroll the way the frames do and shares the coordinate space the
           measured centres are in. */}
-      {ridesOwnRing && images.length > 0 && (
+      {ridesOwnRing && captures.length > 0 && (
         <motion.div
           aria-hidden
           data-gallery-thumbnail-selection
@@ -810,7 +810,7 @@ export function GalleryThumbnailStrip({
 }
 
 interface GalleryThumbnailFrameProps {
-  image: CapturedImage
+  capture: Capture
   displayIndex: number
   label: string
   selected: boolean
@@ -834,7 +834,7 @@ interface GalleryThumbnailFrameProps {
  * registry, which costs nothing and keeps the frame a real motion component.
  */
 function GalleryThumbnailFrame({
-  image,
+  capture,
   displayIndex,
   label,
   selected,
@@ -932,7 +932,7 @@ function GalleryThumbnailFrame({
         )}
       >
         <img
-          src={image.dataUrl || "/placeholder.svg"}
+          src={stillUrl(capture) || "/placeholder.svg"}
           alt=""
           className={cn(
             "block size-full object-cover",

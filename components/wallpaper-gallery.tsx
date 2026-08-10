@@ -1,13 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import type { CapturedImage } from "@/lib/types"
+import type { Capture } from "@/lib/types"
 import type { CloseFlight } from "@/components/gallery-close-flight"
 import { WallpaperGalleryDesktop } from "@/components/wallpaper-gallery-desktop"
 import { WallpaperGalleryMobile } from "@/components/wallpaper-gallery-mobile"
 
 interface WallpaperGalleryProps {
-  images: CapturedImage[]
+  captures: Capture[]
   /**
    * The flight is only handed over when the capture on screen is not the one the
    * shared element is bound to — see GalleryCloseFlight. Every other way out
@@ -17,7 +17,7 @@ interface WallpaperGalleryProps {
   onClose: (flight?: CloseFlight) => void
   onDelete: (id: string) => void
   initialIndex?: number
-  openedImageId: string
+  openedCaptureId: string
   isMobile: boolean
 }
 

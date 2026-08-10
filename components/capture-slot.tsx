@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { CapturedImage } from "@/lib/types"
+import { type Capture, stillUrl } from "@/lib/types"
 import { captureFlash, spring } from "@/lib/springs"
 import { CaptureThumbnail, THUMBNAIL_RADIUS, coverBox } from "./capture-thumbnail"
 
@@ -16,7 +16,7 @@ import { CaptureThumbnail, THUMBNAIL_RADIUS, coverBox } from "./capture-thumbnai
 const OUTGOING_LIFETIME_MS = captureFlash.holdEndMs + spring.moderate.duration * 1000 + 80
 
 interface CaptureSlotProps {
-  image: CapturedImage
+  capture: Capture
   /**
    * The capture this one is replacing, if any. A prop rather than something
    * remembered here: holding it in state meant the whole effect vanished
@@ -24,7 +24,7 @@ interface CaptureSlotProps {
    * desktop bar does not, so the bug showed up on exactly one of them. Derived
    * from the caller's list, it cannot be lost.
    */
-  previous?: CapturedImage | null
+  previous?: Capture | null
   width: number
   height: number
   onClick: () => void
@@ -52,7 +52,7 @@ interface CaptureSlotProps {
  * only job is to be the picture that was already there.
  */
 export function CaptureSlot({
-  image,
+  capture,
   previous,
   width,
   height,
@@ -67,11 +67,11 @@ export function CaptureSlot({
   const [settledId, setSettledId] = useState<string | null>(null)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setSettledId(image.id), OUTGOING_LIFETIME_MS)
+    const timer = window.setTimeout(() => setSettledId(capture.id), OUTGOING_LIFETIME_MS)
     return () => window.clearTimeout(timer)
-  }, [image.id])
+  }, [capture.id])
 
-  const outgoing = settledId === image.id ? null : previous
+  const outgoing = settledId === capture.id ? null : previous
   const outgoingCover = outgoing ? coverBox(outgoing, width, height) : null
 
   return (
@@ -95,7 +95,7 @@ export function CaptureSlot({
         >
           <div className="absolute inset-0 flex items-center justify-center">
             <img
-              src={outgoing.dataUrl || "/placeholder.svg"}
+              src={stillUrl(outgoing) || "/placeholder.svg"}
               alt=""
               className="max-w-none shrink-0"
               style={{ width: outgoingCover.width, height: outgoingCover.height }}
@@ -118,9 +118,9 @@ export function CaptureSlot({
         // The arrival is not replayed for that second kind of remount: the
         // capture has been sitting in the bar for a while by then, and popping it
         // out of existence and back would be an animation about nothing.
-        key={`${image.id}${suppressMorph ? "-still" : ""}`}
-        animateArrival={settledId !== image.id}
-        image={image}
+        key={`${capture.id}${suppressMorph ? "-still" : ""}`}
+        animateArrival={settledId !== capture.id}
+        capture={capture}
         width={width}
         height={height}
         radius={radius}

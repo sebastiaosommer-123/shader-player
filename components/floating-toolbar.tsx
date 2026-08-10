@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, useReducedMotion } from "framer-motion"
-import type { CapturedImage } from "@/lib/types"
+import type { Capture } from "@/lib/types"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Elevated } from "@/lib/elevated"
 import { captureFlash, spring } from "@/lib/springs"
@@ -15,8 +15,8 @@ interface FloatingToolbarProps {
   shaderId: string
   onShaderChange: (shaderId: string) => void
   onCapture: () => void
-  images: CapturedImage[]
-  onThumbnailClick: (imageIndex: number) => void
+  captures: Capture[]
+  onThumbnailClick: (captureIndex: number) => void
   /** Whether to render the thumbnail slot at all — see app/page.tsx. */
   hasSlot: boolean
   /** Passed straight through to the thumbnail; see CaptureThumbnail. */
@@ -36,7 +36,7 @@ export function FloatingToolbar({
   shaderId,
   onShaderChange,
   onCapture,
-  images,
+  captures,
   onThumbnailClick,
   hasSlot,
   suppressMorph,
@@ -47,12 +47,12 @@ export function FloatingToolbar({
   const isMobile = useIsMobile()
   const prefersReducedMotion = useReducedMotion()
 
-  const latestImage = images[images.length - 1]
-  const showThumbnail = !isMobile && !!latestImage
+  const latest = captures[captures.length - 1]
+  const showThumbnail = !isMobile && !!latest
 
   const handleThumbnailClick = () => {
-    const originalIndex = images.findIndex((img) => img.id === latestImage.id)
-    onThumbnailClick(originalIndex !== -1 ? originalIndex : images.length - 1)
+    const originalIndex = captures.findIndex((c) => c.id === latest.id)
+    onThumbnailClick(originalIndex !== -1 ? originalIndex : captures.length - 1)
   }
 
   return (
@@ -112,8 +112,8 @@ export function FloatingToolbar({
       >
         {showThumbnail && (
           <CaptureSlot
-            image={latestImage}
-            previous={images[images.length - 2]}
+            capture={latest}
+            previous={captures[captures.length - 2]}
             width={SLOT_SIZE}
             height={SLOT_SIZE}
             radius={SLOT_RADIUS}
