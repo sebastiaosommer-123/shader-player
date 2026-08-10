@@ -280,6 +280,11 @@ export default function Home() {
   // index the toolbar hands us is already the one they want — no flip on the
   // way in. See the ordering note in either gallery for why that direction.
   const handleThumbnailClick = (captureIndex: number) => {
+    // The bars also make the thumbnail pointer-inert while recording, but that
+    // only stops a pointer: `pointer-events: none` does not stop a keyboard
+    // activation, and the gallery opening mid-clip would leave the shader
+    // animating at full cost behind an opaque backdrop.
+    if (recorder.isRecording) return
     const clicked = captures[captureIndex]
     if (!clicked) return
     // Opening again before the last close has landed: drop the flight so the

@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button"
 import { type Capture, stillUrl } from "@/lib/types"
 import type { CloseFlight } from "@/components/gallery-close-flight"
 import { closeFlightFrom } from "@/components/gallery-close-flight"
-import { downloadImage } from "@/lib/canvas-capture"
+import { downloadCapture } from "@/lib/canvas-capture"
+import { GalleryVideo } from "@/components/gallery-video"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { playDownloadConfirmation } from "@/lib/download-audio"
 import { toast } from "sonner"
@@ -69,6 +70,22 @@ export function WallpaperGalleryMobile({
   // changes — that effect exists to follow a deletion, not to fight a scroll.
   const currentIndexRef = useRef(currentIndex)
   currentIndexRef.current = currentIndex
+
+  /**
+   * The one slide allowed to hold a `<video>`.
+   *
+   * Every capture's slide is in the DOM at once — the carousel is not
+   * virtualised — so mounting a video per slide would spin up a decoder for
+   * every recording in the session. It lags `currentIndex` by a moment as well,
+   * so a fast swipe across several captures does not start and tear down a
+   * decoder for each one it passes. Mid-swipe every slide shows its poster,
+   * which is what you want to see anyway.
+   */
+  const [videoIndex, setVideoIndex] = useState(initialIndex)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVideoIndex(currentIndex), 120)
+    return () => window.clearTimeout(timer)
+  }, [currentIndex])
 
   // The capture on screen, as painted, for a close that has to draw its own
   // collapse — see handleClose. Nulls are ignored rather than stored: React
@@ -224,9 +241,9 @@ export function WallpaperGalleryMobile({
   const handleDownload = () => {
     if (!currentCapture) return
     playDigitalClick("strong")
-    downloadImage(currentCapture.dataUrl, currentCapture.timestamp, currentCapture.shaderId)
+    downloadCapture(currentCapture)
     playDownloadConfirmation("strong")
-    toast.success("Image downloaded")
+    toast.success(currentCapture.kind === "video" ? "Video downloaded" : "Image downloaded")
   }
 
   /**
@@ -465,16 +482,26 @@ export function WallpaperGalleryMobile({
                             draggable={false}
                             onClick={(e) => e.stopPropagation()}
                           />
+                          {capture.kind === "video" && index === videoIndex && (
+                            <GalleryVideo capture={capture} ready={!isMorphing} />
+                          )}
                         </motion.div>
                       ) : (
-                        <img
-                          ref={index === currentIndex ? setCaptureNode : undefined}
-                          src={stillUrl(capture) || "/placeholder.svg"}
-                          alt={`Captured frame ${index + 1} of ${captureCount}`}
-                          className="max-h-full max-w-full"
-                          draggable={false}
-                          onClick={(e) => e.stopPropagation()}
-                        />
+                        // The picture's own box, so a video dropped over it has
+                        // something to be `inset-0` against.
+                        <div className="relative">
+                          <img
+                            ref={index === currentIndex ? setCaptureNode : undefined}
+                            src={stillUrl(capture) || "/placeholder.svg"}
+                            alt={`Captured frame ${index + 1} of ${captureCount}`}
+                            className="max-h-full max-w-full"
+                            draggable={false}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          {capture.kind === "video" && index === videoIndex && (
+                            <GalleryVideo capture={capture} ready />
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

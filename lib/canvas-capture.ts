@@ -1,5 +1,7 @@
 import { encodePng } from "./png-encoder"
 import { SHADER_CONFIGS } from "./shader-configs"
+import type { Capture } from "./types"
+import { extensionFor } from "./video-capture"
 
 /**
  * Long edge of the instant preview.
@@ -118,20 +120,31 @@ function slugify(value: string): string {
  * falls back to terracotta for an id it does not know — a sensible default when
  * you need a shader to render, and the wrong one here, where it would quietly
  * label the file "haze". An unrecognised id drops the segment instead.
+ *
+ * The extension is now negotiated rather than assumed. A still is always a PNG;
+ * a recording lands in whichever container the browser agreed to encode, so it
+ * comes off the capture's own mimeType. Everything above is unchanged by that —
+ * the sortable stamp is as load-bearing for a folder of clips as for a folder of
+ * stills.
+ *
+ * On iOS Safari a blob URL for a video may open in a new tab rather than saving.
+ * Nothing here can prevent that; it is worth knowing before it is filed as a
+ * bug.
  */
-export function downloadImage(dataUrl: string, timestamp: number, shaderId?: string) {
-  const date = new Date(timestamp)
+export function downloadCapture(capture: Capture) {
+  const date = new Date(capture.timestamp)
   const pad = (value: number) => String(value).padStart(2, "0")
   const stamp =
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
     `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
 
-  const shaderName = shaderId ? SHADER_CONFIGS[shaderId]?.name : undefined
+  const shaderName = capture.shaderId ? SHADER_CONFIGS[capture.shaderId]?.name : undefined
   const parts = ["shader", shaderName ? slugify(shaderName) : "", stamp].filter(Boolean)
+  const extension = capture.kind === "video" ? extensionFor(capture.mimeType) : "png"
 
   const link = document.createElement("a")
-  link.href = dataUrl
-  link.download = `${parts.join("-")}.png`
+  link.href = capture.dataUrl
+  link.download = `${parts.join("-")}.${extension}`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)

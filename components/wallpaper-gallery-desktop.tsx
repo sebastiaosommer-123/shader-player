@@ -7,7 +7,8 @@ import { X, Download, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { type Capture, stillUrl } from "@/lib/types"
 import type { CloseFlight } from "@/components/gallery-close-flight"
-import { downloadImage } from "@/lib/canvas-capture"
+import { downloadCapture } from "@/lib/canvas-capture"
+import { GalleryVideo } from "@/components/gallery-video"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { playDownloadConfirmation } from "@/lib/download-audio"
 import { toast } from "sonner"
@@ -117,6 +118,25 @@ export function WallpaperGalleryDesktop({
   }, [measureFitBox])
 
   const prefersReducedMotion = useReducedMotion()
+
+  /**
+   * Whether the opening morph has landed, which is what a video waits for before
+   * it mounts and starts playing.
+   *
+   * A timer as well as the layout callback, because onLayoutAnimationComplete
+   * does not fire at all when there was no layout animation to run — reduced
+   * motion, or a gallery opened with no shared element to morph from — and a
+   * video that waited on it forever would leave the poster up for good.
+   */
+  const [hasMorphed, setHasMorphed] = useState(false)
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setHasMorphed(true),
+      prefersReducedMotion ? 0 : Math.round(galleryMorph.duration * 1000) + 60,
+    )
+    return () => window.clearTimeout(timer)
+  }, [prefersReducedMotion])
+
   // Flips false the instant AnimatePresence starts removing us — long before it
   // actually unmounts us, which it will not do until the fades below finish.
   // See the shared-element container's own comment for why that matters.
@@ -207,9 +227,9 @@ export function WallpaperGalleryDesktop({
   const handleDownload = () => {
     if (!currentCapture) return
     playDigitalClick("strong")
-    downloadImage(currentCapture.dataUrl, currentCapture.timestamp, currentCapture.shaderId)
+    downloadCapture(currentCapture)
     playDownloadConfirmation("strong")
-    toast.success("Image downloaded")
+    toast.success(currentCapture.kind === "video" ? "Video downloaded" : "Image downloaded")
   }
 
   /**
@@ -371,6 +391,7 @@ export function WallpaperGalleryDesktop({
                   className="relative overflow-hidden"
                   style={{ borderRadius: 0, width: fitBox.width, height: fitBox.height }}
                   transition={morphTransition}
+                  onLayoutAnimationComplete={() => setHasMorphed(true)}
                 >
                   <motion.img
                     ref={captureRef}
@@ -383,6 +404,12 @@ export function WallpaperGalleryDesktop({
                     style={{ width: fitBox.width, height: fitBox.height }}
                     onClick={(e) => e.stopPropagation()}
                   />
+
+                  {/* Over the poster, inside the same clip, and never the shared
+                      element itself — see GalleryVideo. */}
+                  {currentCapture.kind === "video" && (
+                    <GalleryVideo capture={currentCapture} ready={hasMorphed} />
+                  )}
                 </motion.div>
               </div>
             </div>
