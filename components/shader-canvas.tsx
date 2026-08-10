@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react"
-import { useReducedMotion } from "framer-motion"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import {
   disposeShader,
@@ -13,25 +12,34 @@ import {
 interface ShaderCanvasProps {
   params: ShaderParams
   shaderId: string
-  isPaused?: boolean
+  /**
+   * Frame rate zero: the loop stops and elapsed shader time stops with it, so a
+   * redraw while frozen reproduces the same frame rather than jumping forward.
+   *
+   * One boolean, derived by the page, which is the only place that knows all the
+   * reasons. There were three — the gallery is open, the capture mode is Image,
+   * and a recording is running (which overrides both) — and reduced motion used
+   * to be a fourth, OR'd in here where nothing else could see it. It now picks
+   * the initial capture mode instead and never touches the runtime path, so this
+   * component is a pure function of one flag. See app/page.tsx.
+   */
+  isFrozen?: boolean
 }
 
 export interface ShaderCanvasRef {
   getCanvas: () => HTMLCanvasElement | null
 }
 
-export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ params, shaderId, isPaused = false }, ref) => {
-  const prefersReducedMotion = useReducedMotion()
+export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ params, shaderId, isFrozen = false }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<WebGLRenderingContext | null>(null)
   const resourcesRef = useRef<ShaderResources | null>(null)
   const animationRef = useRef<number | null>(null)
   const paramsRef = useRef<ShaderParams>(params)
   const shaderIdRef = useRef<string>(shaderId)
-  const isPausedRef = useRef(isPaused)
-  const reducedMotionRef = useRef(Boolean(prefersReducedMotion))
-  const pausedAtRef = useRef<number | null>(null)
-  const totalPausedTimeRef = useRef(0)
+  const isFrozenRef = useRef(isFrozen)
+  const frozenAtRef = useRef<number | null>(null)
+  const totalFrozenTimeRef = useRef(0)
   const renderFnRef = useRef<(() => void) | null>(null)
   const drawFrameRef = useRef<(() => void) | null>(null)
   const isLoopRunningRef = useRef(false)
@@ -42,33 +50,31 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
 
   useEffect(() => {
     paramsRef.current = params
-    if (isPausedRef.current || reducedMotionRef.current) {
+    if (isFrozenRef.current) {
       drawFrameRef.current?.()
     }
   }, [params])
 
   useEffect(() => {
-    const wasStopped = isPausedRef.current || reducedMotionRef.current
+    const wasFrozen = isFrozenRef.current
+    isFrozenRef.current = isFrozen
 
-    isPausedRef.current = isPaused
-    reducedMotionRef.current = Boolean(prefersReducedMotion)
-
-    const isStopped = isPausedRef.current || reducedMotionRef.current
-
-    if (isStopped && !wasStopped) {
-      pausedAtRef.current = Date.now()
+    if (isFrozen && !wasFrozen) {
+      // Frozen at the live moment, which is the whole of what Image mode does to
+      // the canvas: the frame you were looking at is the frame you keep.
+      frozenAtRef.current = Date.now()
       drawFrameRef.current?.()
-    } else if (!isStopped && wasStopped) {
-      if (pausedAtRef.current !== null) {
-        totalPausedTimeRef.current += Date.now() - pausedAtRef.current
-        pausedAtRef.current = null
+    } else if (!isFrozen && wasFrozen) {
+      if (frozenAtRef.current !== null) {
+        totalFrozenTimeRef.current += Date.now() - frozenAtRef.current
+        frozenAtRef.current = null
       }
       if (!isLoopRunningRef.current && renderFnRef.current) {
         isLoopRunningRef.current = true
         renderFnRef.current()
       }
     }
-  }, [isPaused, prefersReducedMotion])
+  }, [isFrozen])
 
   useEffect(() => {
     if (shaderIdRef.current === shaderId) return
@@ -107,14 +113,16 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
     resourcesRef.current = initShader(gl, shaderIdRef.current)
 
     const startTime = Date.now()
-    totalPausedTimeRef.current = 0
-    pausedAtRef.current = isPausedRef.current || reducedMotionRef.current ? startTime : null
+    totalFrozenTimeRef.current = 0
+    frozenAtRef.current = isFrozenRef.current ? startTime : null
 
-    // Elapsed shader time, frozen at the moment of pausing so a redraw while
-    // paused reproduces the same frame rather than jumping forward.
+    // Elapsed shader time, held at the moment of freezing so a redraw while
+    // frozen reproduces the same frame rather than jumping forward — and so
+    // unfreezing resumes with no phase jump, since the frozen interval is
+    // excluded rather than caught up on.
     const elapsed = () => {
-      const now = pausedAtRef.current ?? Date.now()
-      return (now - startTime - totalPausedTimeRef.current) / 1000
+      const now = frozenAtRef.current ?? Date.now()
+      return (now - startTime - totalFrozenTimeRef.current) / 1000
     }
 
     const drawFrame = () => {
@@ -163,7 +171,7 @@ export const ShaderCanvas = forwardRef<ShaderCanvasRef, ShaderCanvasProps>(({ pa
     window.addEventListener("resize", resize)
 
     const render = () => {
-      if (!resourcesRef.current || isPausedRef.current || reducedMotionRef.current) {
+      if (!resourcesRef.current || isFrozenRef.current) {
         isLoopRunningRef.current = false
         return
       }

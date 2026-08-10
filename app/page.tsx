@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, type CSSProperties } from "react"
-import { AnimatePresence } from "framer-motion"
+import { AnimatePresence, useReducedMotion } from "framer-motion"
 import { ShaderCanvas, type ShaderCanvasRef } from "@/components/shader-canvas"
 import { ControlsSidebar } from "@/components/controls-sidebar"
 import { MobileNav } from "@/components/mobile-nav"
@@ -26,6 +26,7 @@ export default function Home() {
   // Mobile is dark-only, so the palette is pinned at the root rather than
   // scoped piecemeal below it. See the note on the container's className.
   const isMobile = useIsMobile()
+  const prefersReducedMotion = useReducedMotion()
   const { isResizing, startResize } = useResizableSidebar()
   const [params, setParams] = useState<ShaderParams>(getShaderConfig("terracotta").defaultParams)
 
@@ -57,6 +58,12 @@ export default function Home() {
     const timer = window.setTimeout(warmPngEncoder, 1200)
     return () => window.clearTimeout(timer)
   }, [])
+
+  // Every reason the canvas stops, in one place. The canvas itself used to OR
+  // reduced motion in privately, which meant no caller could see the whole
+  // answer; it is derived here now because this is the only component that knows
+  // all the terms.
+  const isFrozen = isGalleryOpen || Boolean(prefersReducedMotion)
 
   const handleShaderChange = (newShaderId: string) => {
     console.log("[v0] Changing shader to:", newShaderId)
@@ -205,7 +212,7 @@ export default function Home() {
         {/* overflow-hidden is what actually clips the canvas: the radius sits on
             this wrapper, not on the <canvas> itself. */}
         <div className="relative h-full w-full overflow-hidden rounded-[12px] md:rounded-none">
-          <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} isPaused={isGalleryOpen} />
+          <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} isFrozen={isFrozen} />
           {/* In here rather than over the whole page, so the blink is the
               viewfinder's and not the app's: the chrome is the camera body and
               stays put. Being inside the clip also gets it the artwork's exact
