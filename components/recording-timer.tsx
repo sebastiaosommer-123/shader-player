@@ -3,15 +3,10 @@
 import { useEffect, useRef } from "react"
 import { motion, useMotionValueEvent, useReducedMotion, type MotionValue } from "framer-motion"
 import { spring } from "@/lib/springs"
+import { formatDuration } from "@/lib/video-capture"
 
 interface RecordingTimerProps {
   elapsedMs: MotionValue<number>
-}
-
-function format(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${String(seconds).padStart(2, "0")}`
 }
 
 /**
@@ -43,12 +38,12 @@ export function RecordingTimer({ elapsedMs }: RecordingTimerProps) {
     const seconds = Math.floor(value / 1000)
     if (seconds === secondsRef.current) return
     secondsRef.current = seconds
-    if (readoutRef.current) readoutRef.current.textContent = format(seconds)
+    if (readoutRef.current) readoutRef.current.textContent = formatDuration(value)
   })
 
   useEffect(() => {
     secondsRef.current = 0
-    if (readoutRef.current) readoutRef.current.textContent = format(0)
+    if (readoutRef.current) readoutRef.current.textContent = formatDuration(0)
   }, [])
 
   return (

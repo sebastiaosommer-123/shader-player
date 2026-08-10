@@ -12,6 +12,7 @@ import {
   type Transition,
 } from "framer-motion"
 import { type Capture, stillUrl } from "@/lib/types"
+import { CaptureBadge } from "@/components/capture-badge"
 import { cn } from "@/lib/utils"
 
 interface GalleryThumbnailStripProps {
@@ -926,7 +927,8 @@ function GalleryThumbnailFrame({
       )}
       <div
         className={cn(
-          "size-full",
+          // relative so the badge below has this picture's box to sit in.
+          "relative size-full",
           isVertical &&
             "transition-transform duration-100 ease-out motion-safe:group-active:scale-[0.97]",
         )}
@@ -940,6 +942,10 @@ function GalleryThumbnailFrame({
           )}
           draggable={false}
         />
+        {/* The desktop rail's frames are 80×56 and take the readout; the mobile
+            strip's picture is 33px wide and cannot, so it takes the triangle.
+            See CaptureBadge. */}
+        <CaptureBadge capture={capture} variant={isVertical ? "duration" : "play"} />
       </div>
     </motion.button>
   )

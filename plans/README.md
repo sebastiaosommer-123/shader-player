@@ -15,12 +15,19 @@ explicitly describes the expected earlier-plan changes.
 | [006](006-compositor-safe-color-surface.md) | Move color-surface cursors with compositor transforms | HIGH | DONE | — |
 | [007](007-compositor-safe-gallery-rail.md) | Compose gallery-rail motion into transform strings | HIGH | DONE | — |
 | [008](008-reduced-motion-parameter-overlays.md) | Remove parameter-control movement under reduced motion | MEDIUM | DONE | 006 |
+| [009](009-video-recording.md) | Record the canvas as video | — | DONE | supersedes part of 001 |
 
 ## Execution status
 
 Plans 001–008 are implemented and verified. Plan 008 was executed after plan
 006 so its color-picker accessibility branches preserve the compositor-safe
 saturation cursor work.
+
+Plan 009 is a feature rather than an animation fix, and is recorded here because
+it moves the reduced-motion decision plan 001 made: the shader canvas no longer
+resolves that preference itself. Plan 009 also corrects plan 001's claim that
+`useReducedMotion` is reactive — it is not, so every reduced-motion check in this
+repo needs a reload rather than a live toggle.
 
 ## Status values
 

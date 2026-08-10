@@ -106,3 +106,16 @@ export function videoBitsPerSecond(width: number, height: number): number {
 export function extensionFor(mimeType: string | undefined): "mp4" | "webm" {
   return mimeType?.startsWith("video/mp4") ? "mp4" : "webm"
 }
+
+/**
+ * `0:07`. The viewfinder's timecode and the thumbnails' badge read the same way,
+ * because they are the same number at different moments of its life.
+ *
+ * Rounded down, like every clock: a recording is "0:07" for the whole of its
+ * eighth second, and rounding to nearest would have it claim 0:08 halfway
+ * through.
+ */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`
+}
