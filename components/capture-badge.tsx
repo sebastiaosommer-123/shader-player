@@ -29,6 +29,11 @@ interface CaptureBadgeProps {
  * Bottom-right in both cases: the corner your eye reaches last, and the one the
  * shader's composition is least likely to be doing anything with.
  *
+ * The gallery only. The thumbnail in the bar used to carry the readout too, and
+ * it was the wrong place for it: that slot holds exactly one capture, the newest,
+ * which the user took seconds ago and does not need told apart from anything. A
+ * mark earns its keep when there is a collection to scan, and the bar is not one.
+ *
  * Achromatic like everything else, and legible over any frame because the
  * capture underneath can be any brightness — hence a scrim rather than plain
  * white type.

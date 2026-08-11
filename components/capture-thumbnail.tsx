@@ -5,7 +5,6 @@ import { motion, useReducedMotion } from "framer-motion"
 import { type Capture, stillUrl } from "@/lib/types"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { captureFlash, galleryMorph, spring } from "@/lib/springs"
-import { CaptureBadge } from "./capture-badge"
 
 export const THUMBNAIL_RADIUS = 8
 
@@ -238,9 +237,6 @@ export function CaptureThumbnail({
             />
           </div>
           <div className="absolute inset-0 bg-white/0 group-hoverFine:bg-white/10 transition-colors duration-150 pointer-events-none" />
-          {/* Both bars are wide enough for the readout — 44px is the narrower of
-              them, against roughly 24px of badge. */}
-          <CaptureBadge capture={capture} variant="duration" />
         </motion.button>
       </div>
     </motion.div>
