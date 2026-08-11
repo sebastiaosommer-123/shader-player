@@ -942,10 +942,9 @@ function GalleryThumbnailFrame({
           )}
           draggable={false}
         />
-        {/* The desktop rail's frames are 80×56 and take the readout; the mobile
-            strip's picture is 33px wide and cannot, so it takes the triangle.
-            See CaptureBadge. */}
-        <CaptureBadge capture={capture} variant={isVertical ? "duration" : "play"} />
+        {/* Same mark at the same size on both orientations — the rail used to
+            take a duration readout here and no longer does. See CaptureBadge. */}
+        <CaptureBadge capture={capture} />
       </div>
     </motion.button>
   )
