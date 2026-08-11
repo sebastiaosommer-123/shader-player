@@ -16,6 +16,7 @@ explicitly describes the expected earlier-plan changes.
 | [007](007-compositor-safe-gallery-rail.md) | Compose gallery-rail motion into transform strings | HIGH | DONE | — |
 | [008](008-reduced-motion-parameter-overlays.md) | Remove parameter-control movement under reduced motion | MEDIUM | DONE | 006 |
 | [009](009-video-recording.md) | Record the canvas as video | — | DONE | supersedes part of 001 |
+| [010](010-gallery-video-player.md) | Give recordings a transport in the gallery | — | DONE | 009 |
 
 ## Execution status
 
@@ -28,6 +29,12 @@ it moves the reduced-motion decision plan 001 made: the shader canvas no longer
 resolves that preference itself. Plan 009 also corrects plan 001's claim that
 `useReducedMotion` is reactive — it is not, so every reduced-motion check in this
 repo needs a reload rather than a live toggle.
+
+Plan 010 is likewise a feature, and follows 009 for the obvious reason: it is
+what makes a recording something you can do more with than watch. It also
+records a hazard worth carrying forward — the Browser pane runs `document.hidden`
+with rAF suspended, so any recording made through it encodes almost no frames and
+`video.duration` comes back a fraction of the take.
 
 ## Status values
 

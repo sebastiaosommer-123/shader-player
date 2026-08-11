@@ -11,6 +11,8 @@ import type { CloseFlight } from "@/components/gallery-close-flight"
 import { closeFlightFrom } from "@/components/gallery-close-flight"
 import { downloadCapture } from "@/lib/canvas-capture"
 import { GalleryVideo } from "@/components/gallery-video"
+import { GalleryVideoControls } from "@/components/gallery-video-controls"
+import { useRecordingPlayback } from "@/hooks/use-recording-playback"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { playDownloadConfirmation } from "@/lib/download-audio"
 import { toast } from "sonner"
@@ -139,6 +141,20 @@ export function WallpaperGalleryMobile({
   // actually unmounts us, which it will not do until the fades below finish.
   // See the shared-element container's own comment for why that matters.
   const isPresent = useIsPresent()
+
+  /**
+   * The recording's transport, if the capture on screen is one.
+   *
+   * Keyed on the capture the *scroller* is on rather than the one holding the
+   * mounted `<video>`, and the two are apart for 120ms after every swipe (see
+   * `videoIndex`). Keying it here is what lets the bar stay put across a swipe
+   * between two recordings: the readout comes off `capture.durationMs`, which is
+   * known before any element exists, so it is already correct on the frame the
+   * new clip lands — the element simply catches up to it.
+   */
+  const shownCapture = captures[currentIndex]
+  const playback = useRecordingPlayback(shownCapture)
+  const showsVideo = shownCapture?.kind === "video"
 
   const scrollToIndex = useCallback((index: number, smooth: boolean) => {
     const element = carouselRef.current?.element
@@ -480,10 +496,19 @@ export function WallpaperGalleryMobile({
                             className="block"
                             style={{ width: fitBox.width, height: fitBox.height }}
                             draggable={false}
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (index === currentIndex && capture.kind === "video") {
+                                playback.toggleControls()
+                              }
+                            }}
                           />
                           {capture.kind === "video" && index === videoIndex && (
-                            <GalleryVideo capture={capture} ready={!isMorphing} />
+                            <GalleryVideo
+                              capture={capture}
+                              ready={!isMorphing}
+                              attachVideo={playback.attachVideo}
+                            />
                           )}
                         </motion.div>
                       ) : (
@@ -496,10 +521,19 @@ export function WallpaperGalleryMobile({
                             alt={`Captured frame ${index + 1} of ${captureCount}`}
                             className="max-h-full max-w-full"
                             draggable={false}
-                            onClick={(e) => e.stopPropagation()}
+                            // Still stops the gallery closing on a tap over the
+                            // picture; a recording additionally takes the tap as
+                            // the touch equivalent of moving a mouse, since
+                            // there is no hover here for the bar to read.
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (index === currentIndex && capture.kind === "video") {
+                                playback.toggleControls()
+                              }
+                            }}
                           />
                           {capture.kind === "video" && index === videoIndex && (
-                            <GalleryVideo capture={capture} ready />
+                            <GalleryVideo capture={capture} ready attachVideo={playback.attachVideo} />
                           )}
                         </div>
                       )}
@@ -527,6 +561,23 @@ export function WallpaperGalleryMobile({
       >
         {captureCount > 0 && (
           <div className="absolute inset-x-0 bottom-0">
+            {/* The transport sits above the filmstrip, in flow rather than at
+                some offset from the bottom — which is the whole reason it is
+                stacked here instead of drawn inside the capture like the
+                pointer gallery's. The strip's height is its frames plus its own
+                `env(safe-area-inset-bottom)` floor, so any number this bar held
+                to clear it would be a number that has to be maintained
+                alongside it.
+
+                Full-bleed rather than sized to the picture, because on a phone
+                it is sitting in the letterbox beneath the capture, not on it. */}
+            {showsVideo && (
+              <GalleryVideoControls
+                playback={playback}
+                placement="above-strip"
+                className="pointer-events-auto"
+              />
+            )}
             <GalleryThumbnailStrip
               captures={captures}
               currentIndex={currentIndex}

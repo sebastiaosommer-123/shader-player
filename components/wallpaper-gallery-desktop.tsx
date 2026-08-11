@@ -9,6 +9,8 @@ import { type Capture, stillUrl } from "@/lib/types"
 import type { CloseFlight } from "@/components/gallery-close-flight"
 import { downloadCapture } from "@/lib/canvas-capture"
 import { GalleryVideo } from "@/components/gallery-video"
+import { GalleryVideoControls } from "@/components/gallery-video-controls"
+import { useRecordingPlayback } from "@/hooks/use-recording-playback"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { playDownloadConfirmation } from "@/lib/download-audio"
 import { toast } from "sonner"
@@ -141,6 +143,43 @@ export function WallpaperGalleryDesktop({
   // actually unmounts us, which it will not do until the fades below finish.
   // See the shared-element container's own comment for why that matters.
   const isPresent = useIsPresent()
+
+  /**
+   * The recording's transport, if the capture on screen is one.
+   *
+   * Owned here rather than by either half of it, because the two halves are in
+   * different subtrees — the `<video>` is inside the morph card, the bar is in
+   * the chrome layer below. Called unconditionally, on the capture the viewer is
+   * actually showing; it costs nothing on a still.
+   */
+  const playback = useRecordingPlayback(shownCapture)
+  const showsVideo = shownCapture?.kind === "video"
+
+  /**
+   * Space plays and pauses, which is the one keyboard convention a transport
+   * cannot do without.
+   *
+   * Guarded on the target, and the guard is not decoration: Radix parks focus on
+   * the close button when the dialog opens, and Space on a focused button is
+   * that button's own activation. Anything focusable keeps its Space; only the
+   * dead ground around the controls hands it here.
+   */
+  useEffect(() => {
+    if (!showsVideo) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target
+      if (target instanceof HTMLElement && target.closest("button, input, textarea, [role='slider']")) {
+        return
+      }
+      event.preventDefault()
+      playback.toggle()
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+    // The hook's returned object is fresh every render; its callbacks are not,
+    // and subscribing on the object would re-bind this listener on every one.
+  }, [playback.toggle, showsVideo])
 
   useEffect(() => {
     if (currentIndex >= captures.length && captures.length > 0) {
@@ -357,6 +396,14 @@ export function WallpaperGalleryDesktop({
         <div
           className="fixed inset-0 overflow-hidden md:inset-8"
           onClick={handleClose}
+          // The bar answers to movement anywhere over the viewer, not just to
+          // movement over the 60px of it the bar occupies — a cursor on its way
+          // across the picture is a reader who has come back, and making them
+          // find the bar before it will show itself is the failure the timer
+          // exists to avoid in the first place.
+          onMouseMove={showsVideo ? playback.registerActivity : undefined}
+          onMouseEnter={showsVideo ? playback.registerActivity : undefined}
+          onMouseLeave={showsVideo ? playback.hideControls : undefined}
         >
           {currentCapture && (
             // A delete's arrival rides on this wrapper instead of the image.
@@ -375,6 +422,10 @@ export function WallpaperGalleryDesktop({
                   the card everywhere except at the very end, and the card clips
                   it. The capture fills the aperture the entire way across; what
                   changes is how much of it you are allowed to see. */}
+              {/* These insets and the `fitBox` below are mirrored by the
+                  controls bar's box in the chrome layer, which is how the bar
+                  finds the foot of the picture without measuring anything. Move
+                  either and move both. */}
               <div className="absolute inset-y-0 left-0 right-28 flex items-center justify-center">
                 {/* layoutDependency pins the layout animation to the open and the
                     close and nothing else. Framer animates a projection node
@@ -406,9 +457,15 @@ export function WallpaperGalleryDesktop({
                   />
 
                   {/* Over the poster, inside the same clip, and never the shared
-                      element itself — see GalleryVideo. */}
+                      element itself — see GalleryVideo. The transport for it is
+                      not in here: it is in the chrome layer below, against a box
+                      that mirrors this one. */}
                   {currentCapture.kind === "video" && (
-                    <GalleryVideo capture={currentCapture} ready={hasMorphed} />
+                    <GalleryVideo
+                      capture={currentCapture}
+                      ready={hasMorphed}
+                      attachVideo={playback.attachVideo}
+                    />
                   )}
                 </motion.div>
               </div>
@@ -430,6 +487,35 @@ export function WallpaperGalleryDesktop({
             : { duration: 0.18, delay: 0.3, ease: "easeOut" }
         }
       >
+        {/* The transport, over the foot of the recording.
+
+            In the chrome layer with the close and delete buttons rather than
+            inside the card, and both halves of that are deliberate. The card is
+            a projection node — Framer owns its transform for the length of the
+            morph, and a plain child of one is scaled along with it. And this
+            layer already fades in on `{ delay: 0.3, duration: 0.18 }`, which is
+            the curve the bar wants anyway, so the whole of the gallery's chrome
+            arrives as one thing instead of two.
+
+            The price is this box, which mirrors the capture's own geometry so
+            the bar lands on the picture and not on the letterbox: the wrapper's
+            insets and `fitBox` are duplicated from the shared element above and
+            have to be kept in step with it. */}
+        {showsVideo && hasMorphed && (
+          <div className="absolute inset-y-0 left-0 right-28 flex items-center justify-center">
+            <div
+              className="pointer-events-none relative"
+              style={{ width: fitBox.width, height: fitBox.height }}
+            >
+              <GalleryVideoControls
+                playback={playback}
+                placement="over-capture"
+                className="pointer-events-auto"
+              />
+            </div>
+          </div>
+        )}
+
         {captures.length > 0 && (
           <div className="absolute bottom-20 right-0 top-20">
             <GalleryThumbnailStrip

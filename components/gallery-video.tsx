@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Play } from "lucide-react"
 import type { Capture } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -12,6 +12,15 @@ interface GalleryVideoProps {
    * it has — see below.
    */
   ready: boolean
+  /**
+   * The playback hook's callback ref, so the controls bar — which is a long way
+   * from here, in the gallery's chrome layer — can reach this element.
+   *
+   * Handed the node as well as, not instead of, the ref below: playback state
+   * belongs to the gallery now, but *starting* the thing still belongs to this
+   * component, for all the reasons in the comment above.
+   */
+  attachVideo?: (node: HTMLVideoElement | null) => void
 }
 
 /**
@@ -37,12 +46,25 @@ interface GalleryVideoProps {
  *
  * `pointer-events: none` is what keeps the gallery's click and swipe semantics
  * intact: the poster underneath still stops propagation, the card still closes
- * on a background click, and the carousel still pages under a finger.
+ * on a background click, and the carousel still pages under a finger. It is also
+ * why the transport is not in here: a bar drawn inside this card would have to
+ * take those events back. It lives in the gallery's chrome layer instead — see
+ * GalleryVideoControls — and reaches this element through `attachVideo`.
  */
-export function GalleryVideo({ capture, ready }: GalleryVideoProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+export function GalleryVideo({ capture, ready, attachVideo }: GalleryVideoProps) {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
   const [playing, setPlaying] = useState(false)
   const [blocked, setBlocked] = useState(false)
+
+  // One node, two readers: this component starts and retries playback, the
+  // gallery's hook reads the element's state for the bar.
+  const setVideoNode = useCallback(
+    (node: HTMLVideoElement | null) => {
+      videoRef.current = node
+      attachVideo?.(node)
+    },
+    [attachVideo],
+  )
 
   useEffect(() => {
     const video = videoRef.current
@@ -59,7 +81,7 @@ export function GalleryVideo({ capture, ready }: GalleryVideoProps) {
   return (
     <>
       <video
-        ref={videoRef}
+        ref={setVideoNode}
         src={capture.dataUrl}
         // muted and playsInline are both mandatory: without them iOS blocks the
         // autoplay and then takes the video fullscreen.
