@@ -57,7 +57,10 @@ export function ParameterGroup({ group, params, onChange, shaderId, spacing = "n
 
   return (
     <Collapsible open={!collapsed} onOpenChange={handleToggle}>
-      <CollapsibleTrigger className="group flex h-9 w-full cursor-pointer items-center justify-between text-sm uppercase tracking-wider text-muted-foreground transition-[color,transform] duration-[125ms] ease-[cubic-bezier(0.23,1,0.32,1)] hoverFine:text-foreground active:scale-[0.99] motion-reduce:transform-none motion-reduce:transition-none">
+      {/* No press scale on either surface: the disclosure itself — the chevron
+          turning, the content opening — is the whole receipt this needs, and a
+          full-width row dipping under the finger only competes with it. */}
+      <CollapsibleTrigger className="group flex h-9 w-full cursor-pointer items-center justify-between text-sm uppercase tracking-wider text-muted-foreground transition-colors duration-[125ms] ease-[cubic-bezier(0.23,1,0.32,1)] hoverFine:text-foreground motion-reduce:transition-none">
         <h3>{group.name}</h3>
         {/* Deliberately not the dropdown's ChevronDown: that one opens a menu
             over the page, this reveals content in place. Pointing right at rest
