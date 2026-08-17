@@ -143,7 +143,15 @@ export function FloatingToolbar({
         )}
       </motion.div>
 
-      <ShaderTabs shaderId={shaderId} onShaderChange={onShaderChange} layoutIdPrefix="desktop" />
+      <ShaderTabs
+        shaderId={shaderId}
+        onShaderChange={onShaderChange}
+        layoutIdPrefix="desktop"
+        // Locked mid-clip alongside the mode track beside it. Not for the same
+        // reason — a shader swap is a program swap on a live canvas, so the clip
+        // survives it — but because a recording is meant to be of one artwork.
+        disabled={isRecording}
+      />
 
       {/* Between the shader tabs and the shutter, and the order is the whole
           argument: this track changes what the button beside it *does*, so it

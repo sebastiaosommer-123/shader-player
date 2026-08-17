@@ -186,6 +186,9 @@ export function MobileNav({
         onOpenChange={setSheetOpen}
         shaderId={shaderId}
         onShaderChange={onShaderChange}
+        // The sheet stays openable mid-recording — the parameters inside it are
+        // live, and that is the point — but the shader picker in it is not.
+        isRecording={isRecording}
       />
     </>
   )

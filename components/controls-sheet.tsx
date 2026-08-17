@@ -19,6 +19,8 @@ interface ControlsSheetProps {
   onOpenChange: (open: boolean) => void
   shaderId: string
   onShaderChange: (shaderId: string) => void
+  /** Freezes the shader picker mid-clip. The parameters below it stay live. */
+  isRecording?: boolean
 }
 
 export function ControlsSheet({
@@ -28,6 +30,7 @@ export function ControlsSheet({
   onOpenChange,
   shaderId,
   onShaderChange,
+  isRecording = false,
 }: ControlsSheetProps) {
   const prefersReducedMotion = useReducedMotion()
   const returnFocusRef = useRef<HTMLElement | null>(null)
@@ -92,6 +95,7 @@ export function ControlsSheet({
               onShaderChange={onShaderChange}
               layoutIdPrefix="sheet"
               size="mobile"
+              disabled={isRecording}
             />
           </div>
 
