@@ -156,9 +156,10 @@ export function FloatingToolbar({
       {/* Between the shader tabs and the shutter, and the order is the whole
           argument: this track changes what the button beside it *does*, so it
           belongs against the button. The shader tabs change the artwork, so they
-          stay against the artwork's end of the bar. Two identical-looking tracks
-          side by side is a real legibility risk, and adjacency is what tells you
-          which is which without either having to look different. */}
+          stay against the artwork's end of the bar. Adjacency is what tells you
+          which is which — and it no longer carries that alone, now that the two
+          hold different kinds of thing: circled numerals there, worded pills
+          here. The shapes separate them at a glance; the order still says why. */}
       {videoSupported && (
         <ModeTabs
           mode={mode}

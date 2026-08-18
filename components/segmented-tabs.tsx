@@ -29,6 +29,13 @@ interface SegmentedTabsProps {
   layoutIdSuffix: string
   size?: "desktop" | "mobile"
   /**
+   * What the cells hold decides this, so the caller does: a numeral wants a
+   * circle and a word wants a pill. Both are mounted side by side in the desktop
+   * bar — 01/02/03 against Image/Video — so it cannot be one choice for the
+   * component. See SIZES.
+   */
+  shape?: "pill" | "circle"
+  /**
    * Inert and dimmed. Used while a recording is running, where changing the
    * capture mode mid-clip would freeze the canvas halfway through it.
    */
@@ -52,30 +59,40 @@ interface SegmentedTabsProps {
  * component — that bar is sized for thumbs, and its own row has no slot or
  * shutter beside the track to line up with.
  *
- * The height is the fixed number and the width is not: cells are `h-9 px-3`
- * rather than `size-9`, so each one is as wide as the word it holds. A square
- * cell is what a numeral wanted; a word wants a pill.
+ * The height is the fixed number in both shapes; only the width differs, and
+ * what the cell holds is what decides it. A `pill` is `px-3` and comes out as
+ * wide as the word inside it. A `circle` is `size-*`, the same number as the
+ * height, which is what a numeral wants — it has no length to express. Neither
+ * needs a radius of its own: the cell carries `rounded-full`, so a square box
+ * *is* the circle.
  *
- * 13px rather than text-sm, which is what the sliders are set at. A numeral gave
- * you nothing to compare it against, so the extra pixel it used to carry went
- * unnoticed; a word sits in the same bar as words elsewhere and has to agree
- * with them. Everything in the app is Space Mono 400 — size, case and tracking
- * are the only things that ever vary.
+ * Both are on screen at once in the desktop bar, which is why this is the
+ * caller's choice and not the component's: the shader track holds 01/02/03 and
+ * the mode track beside it holds Image/Video.
+ *
+ * 13px in both, which is what the sliders and the sidebar are set at. The
+ * numerals were a step above that when they were the only track in the app and
+ * had nothing to be compared against; they have a track of words beside them
+ * now, and one of the two being a pixel larger is a mismatch you can see.
+ * Everything in the app is Space Mono 400 — size, case and tracking are the only
+ * things that ever vary.
  *
  * They differ only between the cells: desktop butts them, mobile spaces them for
  * the touch targets.
  *
- * `cellHeight` is the pixel value of the `cell` class, and half of it is the
- * indicator's radius. Written out rather than left to `rounded-full`, because
- * the indicator morphs *width* as well as position — the cells are not all the
- * same size. Framer's layout projection interpolates whatever number it is
- * given, so a 9999px sentinel rides the whole morph as an ellipse; the real
- * radius stays a pill at both ends. Same lesson as SLOT_RADIUS in
- * lib/toolbar-geometry.ts. Keep it in step with the class beside it.
+ * `cellHeight` is the pixel value of the cell class, and half of it is the
+ * indicator's radius. Written out rather than left to `rounded-full` because of
+ * the pill instances: there the indicator morphs *width* as well as position,
+ * the cells not all being the same size, and Framer's layout projection
+ * interpolates whatever number it is given — so a 9999px sentinel rides the
+ * whole morph as an ellipse while the real radius stays a pill at both ends.
+ * The circle instances only ever travel, so the value is merely correct for
+ * them rather than load-bearing. Same lesson as SLOT_RADIUS in
+ * lib/toolbar-geometry.ts. Keep it in step with the classes beside it.
  */
 const SIZES = {
-  desktop: { track: "gap-0 p-1", cell: "h-9 px-3", text: "text-[13px]", cellHeight: 36 },
-  mobile: { track: "gap-1 p-1", cell: "h-10 px-3", text: "text-[13px]", cellHeight: 40 },
+  desktop: { track: "gap-0 p-1", pill: "h-9 px-3", circle: "size-9", text: "text-[13px]", cellHeight: 36 },
+  mobile: { track: "gap-1 p-1", pill: "h-10 px-3", circle: "size-10", text: "text-[13px]", cellHeight: 40 },
 } as const
 
 /**
@@ -98,6 +115,7 @@ export function SegmentedTabs({
   layoutIdPrefix,
   layoutIdSuffix,
   size = "desktop",
+  shape = "pill",
   disabled = false,
 }: SegmentedTabsProps) {
   const prefersReducedMotion = useReducedMotion()
@@ -137,7 +155,7 @@ export function SegmentedTabs({
             onClick={() => handleSelect(option.id)}
             className={cn(
               "relative flex items-center justify-center rounded-full transition-[color,transform] duration-150 ease-out active:scale-[0.97] motion-reduce:transition-none",
-              SIZES[size].cell,
+              SIZES[size][shape],
               SIZES[size].text,
               isSelected ? "text-foreground" : "text-muted-foreground hoverFine:text-foreground",
             )}

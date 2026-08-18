@@ -29,15 +29,36 @@ export interface ShaderParameterGroup {
 export interface ShaderConfig {
   id: string
   /**
-   * One word, and it names the mark you can see rather than the technique that
-   * draws it — Haze, not Gradient Wave. This is the tab's visible label, in a
-   * track that has to sit between the thumbnail slot and the shutter on desktop
-   * and between the thumbnail and the filters button on a phone, so a second
-   * word costs real estate in the one place there is none. It is also the only
-   * thing the tabs read off a shader, which is what keeps this the single
-   * source of truth for what a shader is called.
+   * The human word for the shader — Haze, not Gradient Wave: the mark you can
+   * see rather than the technique that draws it.
+   *
+   * It is no longer what the tabs show. It survives for the one surface where
+   * the artwork is *not* sitting next to the label: the download filename. A
+   * folder of `shader-01-….png` tells you nothing about what made each one; a
+   * folder of `shader-haze-….png` still does. See downloadCapture in
+   * lib/canvas-capture.ts, which is now this field's only reader.
    */
   name: string
+  /**
+   * What the tab shows: 01, 02, 03.
+   *
+   * A numeral rather than the word, for two reasons that are both particular to
+   * this app. The tab sits an inch under a full-bleed canvas playing the shader
+   * it names, so a word there describes something you are already looking at and
+   * does no identification work — it is chrome trying to be interesting. And the
+   * word is falsifiable by the user, which is the whole point of the sliders:
+   * push Haze's grain up and swap its four colours to greens and it is not haze
+   * any more, at which point the tab is lying about the artwork. A numeral
+   * cannot be wrong about anything.
+   *
+   * It also reads as an edition, and shader four costs no naming decision.
+   *
+   * Zero-padded because the padding is what makes it read as an edition rather
+   * than a count. It also keeps every cell the same glyph width once a tenth
+   * shader arrives — the cells are circles sized for their contents, so a set
+   * mixing "9" with "10" would not stay one column wide.
+   */
+  label: string
   fragmentShader: string
   defaultParams: Record<string, number | string>
   parameterGroups: ShaderParameterGroup[]
@@ -431,6 +452,7 @@ export const SHADER_CONFIGS: Record<string, ShaderConfig> = {
   terracotta: {
     id: "terracotta",
     name: "Haze",
+    label: "01",
     fragmentShader: terracottaFragmentShader,
     defaultParams: {
       horizontalWaveAmplitude: 0.05,
@@ -512,6 +534,7 @@ export const SHADER_CONFIGS: Record<string, ShaderConfig> = {
   plasma: {
     id: "plasma",
     name: "Bars",
+    label: "02",
     fragmentShader: plasmaWaveFragmentShader,
     defaultParams: {
       baseRows: 5.0,
@@ -555,6 +578,7 @@ export const SHADER_CONFIGS: Record<string, ShaderConfig> = {
   pixelTopography: {
     id: "pixelTopography",
     name: "Rings",
+    label: "03",
     fragmentShader: pixelTopographyFragmentShader,
     defaultParams: {
       gridX: 25.0,

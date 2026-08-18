@@ -88,8 +88,15 @@ export function ControlsSheet({
 
           {/* Pinned above the scroll region rather than sitting at the top of it:
               which shader you are on is the frame for everything below, and a
-              frame that scrolls away is not one. */}
-          <div className="shrink-0 px-4 pb-4">
+              frame that scrolls away is not one.
+
+              `w-fit` because the track is a recess the cells sit in, not a bar
+              the sheet is divided by. Left to stretch it spans the full sheet —
+              a flex container is block-level, so it takes the width it is given
+              rather than the width it needs — and the run of empty track past
+              the last cell then reads as a fourth slot that never fills. Three
+              words nearly hid that; three circles do not. */}
+          <div className="w-fit shrink-0 px-4 pb-4">
             <ShaderTabs
               shaderId={shaderId}
               onShaderChange={onShaderChange}

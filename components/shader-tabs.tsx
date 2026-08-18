@@ -7,7 +7,7 @@ interface ShaderTabsProps {
   shaderId: string
   onShaderChange: (shaderId: string) => void
   /**
-   * One prefix per instance. There are three of these mounted at once — the
+   * One prefix per instance. There are two of these mounted at once — the
    * desktop toolbar's, and the one in the mobile controls sheet — and the bars
    * are only CSS-hidden, never unmounted. See SegmentedTabs.
    */
@@ -22,6 +22,10 @@ interface ShaderTabsProps {
  *
  * The control itself is SegmentedTabs, which this shared with the capture-mode
  * picker the moment that arrived; all that is left here is the list.
+ *
+ * The cells read 01, 02, 03 rather than Haze, Bars and Rings — see `label` on
+ * ShaderConfig for why, and `name` beside it for where the words went. A numeral
+ * takes the circle shape; the mode track next to it keeps the pill.
  */
 export function ShaderTabs({
   shaderId,
@@ -30,7 +34,7 @@ export function ShaderTabs({
   size = "desktop",
   disabled = false,
 }: ShaderTabsProps) {
-  const options = getAllShaderIds().map((id) => ({ id, label: getShaderConfig(id).name }))
+  const options = getAllShaderIds().map((id) => ({ id, label: getShaderConfig(id).label }))
 
   return (
     <SegmentedTabs
@@ -41,6 +45,7 @@ export function ShaderTabs({
       layoutIdPrefix={layoutIdPrefix}
       layoutIdSuffix="shader-tab"
       size={size}
+      shape="circle"
       disabled={disabled}
     />
   )
