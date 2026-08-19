@@ -79,6 +79,15 @@ interface CaptureThumbnailProps {
    */
   suppressMorph?: boolean
   /**
+   * Inert and out of the tab order, for as long as a recording is running.
+   *
+   * The `pointer-events-none` on the slot around it stops a pointer and nothing
+   * else: the button stayed focusable, and Enter on it played the confirm click
+   * in full before the page's own guard silently swallowed the open. Only the
+   * attribute takes the keyboard and the sound with it.
+   */
+  disabled?: boolean
+  /**
    * Whether to fade and settle into place on mount.
    *
    * True for a capture that has just been taken, which is what the arrival is
@@ -102,6 +111,7 @@ export function CaptureThumbnail({
   elevated = true,
   radius = THUMBNAIL_RADIUS,
   suppressMorph = false,
+  disabled = false,
   animateArrival = true,
 }: CaptureThumbnailProps) {
   const prefersReducedMotion = useReducedMotion()
@@ -208,6 +218,7 @@ export function CaptureThumbnail({
           // is the box the morph lands on: the radius and the clip are both
           // here.
           data-capture-thumbnail
+          disabled={disabled}
           onClick={handleClick}
           className="group relative block cursor-pointer appearance-none overflow-hidden border-0 bg-transparent p-0 text-inherit outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           style={{

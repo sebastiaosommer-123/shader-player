@@ -104,9 +104,25 @@ export function FloatingToolbar({
           hasSlot ? "overflow-visible" : "overflow-hidden",
           // Opening the gallery mid-recording would leave the shader animating
           // at full cost behind an opaque backdrop, recording something nobody
-          // can see. Inert rather than dimmed: the thumbnail is a picture, and
-          // fading it would read as the capture itself being unavailable.
-          isRecording && "pointer-events-none",
+          // can see.
+          //
+          // Dimmed as well as inert, which reverses the note that used to stand
+          // here: that fading a picture would read as the capture itself being
+          // unavailable. True of a thumbnail dimmed on its own, and this one
+          // never is — both tracks beside it go to the same 40% on the same
+          // frame, and against them a thumbnail left at full strength did not
+          // read as an available picture, it read as the one control still live
+          // in a locked bar. It is the brightest thing in the row at exactly the
+          // moment it does nothing.
+          //
+          // 70%, where the two tracks beside it are at 40%, and deliberately
+          // not the same number. Those are labels and this is a photograph: it
+          // has more to lose, and at 40% it stopped reading as a dimmed picture
+          // and started reading as a damaged one — the objection above coming
+          // true by the other route. 70% is enough to drop it behind the
+          // shutter without taking the frame with it.
+          "transition-opacity duration-150 ease-out motion-reduce:transition-none",
+          isRecording && "pointer-events-none opacity-70",
         )}
         // Animating layout properties rather than a transform, knowingly —
         // see the note above on why the width is the point. One 48px box on a
@@ -138,6 +154,9 @@ export function FloatingToolbar({
             // read as a sticker sitting on it.
             elevated={false}
             suppressMorph={suppressMorph}
+            // pointer-events-none above stops a pointer and nothing else; this
+            // is what takes the keyboard and the click sound with it.
+            disabled={isRecording}
             onClick={handleThumbnailClick}
           />
         )}

@@ -32,6 +32,8 @@ interface CaptureSlotProps {
   radius?: number
   /** Passed straight through; see CaptureThumbnail. */
   suppressMorph?: boolean
+  /** Passed straight through; see CaptureThumbnail. */
+  disabled?: boolean
 }
 
 /**
@@ -60,6 +62,7 @@ export function CaptureSlot({
   elevated = true,
   radius = THUMBNAIL_RADIUS,
   suppressMorph = false,
+  disabled = false,
 }: CaptureSlotProps) {
   // Which capture has finished arriving. Latched by a timer, and deliberately
   // fails *safe*: a remount resets it to null, which shows the outgoing layer
@@ -126,6 +129,7 @@ export function CaptureSlot({
         radius={radius}
         elevated={elevated}
         suppressMorph={suppressMorph}
+        disabled={disabled}
         onClick={onClick}
       />
     </>

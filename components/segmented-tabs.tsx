@@ -40,6 +40,16 @@ interface SegmentedTabsProps {
    * capture mode mid-clip would freeze the canvas halfway through it.
    */
   disabled?: boolean
+  /**
+   * Whether `disabled` also dims the track.
+   *
+   * True everywhere the track is the only thing saying it is disabled. False in
+   * the mobile bar, where the whole control fades out for the length of a clip
+   * and the dim would animate underneath the fade — two opacity curves on one
+   * element, leaving the track visibly ahead of the thumbnail beside it. The
+   * inertness is the half worth keeping; the statement is already being made.
+   */
+  dimWhenDisabled?: boolean
 }
 
 /**
@@ -117,6 +127,7 @@ export function SegmentedTabs({
   size = "desktop",
   shape = "pill",
   disabled = false,
+  dimWhenDisabled = true,
 }: SegmentedTabsProps) {
   const prefersReducedMotion = useReducedMotion()
   const substrate = useSurface()
@@ -138,7 +149,8 @@ export function SegmentedTabs({
       className={cn(
         "flex items-center rounded-full bg-foreground/[0.06] transition-opacity duration-150 ease-out motion-reduce:transition-none",
         SIZES[size].track,
-        disabled && "pointer-events-none opacity-40",
+        disabled && "pointer-events-none",
+        disabled && dimWhenDisabled && "opacity-40",
       )}
     >
       {options.map((option) => {

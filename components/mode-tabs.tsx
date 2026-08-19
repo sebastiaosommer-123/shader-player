@@ -24,6 +24,8 @@ interface ModeTabsProps {
   size?: "desktop" | "mobile"
   /** Inert mid-recording: switching to Image would freeze the canvas mid-clip. */
   disabled?: boolean
+  /** Passed straight through; see SegmentedTabs. */
+  dimWhenDisabled?: boolean
 }
 
 /**
@@ -45,6 +47,7 @@ export function ModeTabs({
   layoutIdPrefix,
   size = "desktop",
   disabled = false,
+  dimWhenDisabled = true,
 }: ModeTabsProps) {
   return (
     <SegmentedTabs
@@ -56,6 +59,7 @@ export function ModeTabs({
       layoutIdSuffix="mode-tab"
       size={size}
       disabled={disabled}
+      dimWhenDisabled={dimWhenDisabled}
     />
   )
 }

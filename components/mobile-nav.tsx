@@ -10,7 +10,6 @@ import { ModeTabs, type CaptureMode } from "./mode-tabs"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { useReducedMotion, type MotionValue } from "framer-motion"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { cn } from "@/lib/utils"
 
 /** Matches the iOS camera proportions: round thumb, round control. The shutter
  *  owns its own geometry; see SHUTTER_SIZES in ShutterButton. */
@@ -60,14 +59,43 @@ export function MobileNav({
   const prefersReducedMotion = useReducedMotion()
   const isMobile = useIsMobile()
 
-  const hiddenTransform = sheetOpen && !prefersReducedMotion ? "scale(0.97)" : "scale(1)"
-  const hideWhileSheetOpen = (duration: number) => ({
-    opacity: sheetOpen ? 0 : 1,
-    transform: hiddenTransform,
-    pointerEvents: sheetOpen ? ("none" as const) : ("auto" as const),
+  /**
+   * The bar's one way of putting a control away: fade it, and step it back 3%.
+   *
+   * Written once and taken by everything that leaves, because there is more than
+   * one reason to leave now — the sheet taking the screen, and a recording
+   * starting — and a bar with two different exits reads as two bars. The scale
+   * is what keeps it from being a light switch: nothing here vanishes from full
+   * size, it withdraws. Dropped under reduced motion, where the fade alone still
+   * carries the change.
+   *
+   * cubic-bezier(0.23, 1, 0.32, 1) is a hard ease-out — most of the distance is
+   * covered in the first third — so the control is perceptually gone well before
+   * the 180ms is up, and the shutter has the moment to itself.
+   *
+   * Nothing reflows on the way out. Every slot in the row is fixed width, so the
+   * controls go from their places rather than the row closing over them, and
+   * they come back to the same pixels.
+   */
+  const hide = (duration: number, hidden: boolean) => ({
+    opacity: hidden ? 0 : 1,
+    transform: hidden && !prefersReducedMotion ? "scale(0.97)" : "scale(1)",
+    pointerEvents: hidden ? ("none" as const) : ("auto" as const),
     transitionDuration: prefersReducedMotion ? "0ms" : `${duration}ms`,
     transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
   })
+
+  /**
+   * What the two clip-time controls answer to.
+   *
+   * The iOS camera clears its mode carousel the instant a recording starts, and
+   * this is the same idea: for the length of a clip the thumbnail and the mode
+   * track are not dimmed versions of themselves, they are gone, and what is left
+   * on the bar is the one control the moment is about. The sheet is the other
+   * reason either of them leaves, and hidden is hidden — the two states overlap
+   * happily, since the sheet stays openable mid-clip on purpose.
+   */
+  const hiddenForClip = sheetOpen || isRecording
 
   const latest = captures[captures.length - 1]
   const showThumbnail = isMobile && !!latest
@@ -99,7 +127,7 @@ export function MobileNav({
             isRecording={isRecording}
             progress={recordingProgress}
             className="transition-[opacity,transform]"
-            style={hideWhileSheetOpen(150)}
+            style={hide(150, sheetOpen)}
           />
 
           {/* The outer slots are the same width, which is what keeps the tabs
@@ -114,14 +142,15 @@ export function MobileNav({
                 effect. Sizing this from its contents meant the row's left slot
                 was 0 wide for one paint, and `justify-between` started the tabs
                 22px left of centre before sliding them over. */}
+            {/* Gone for the length of a clip; see hiddenForClip. Where the
+                desktop bar dims its thumbnail to 70% and leaves it there, this
+                one leaves — the two bars are not the same object. That one is a
+                toolbar with a sidebar beside it and a row of controls that stay
+                put; this one is the back of a camera, and a camera clears its
+                controls when it starts rolling. */}
             <div
-              className={cn(
-                "relative z-10 shrink-0 transition-[opacity,transform]",
-                // See the matching note in FloatingToolbar: the gallery is
-                // unreachable mid-recording.
-                isRecording && "pointer-events-none",
-              )}
-              style={{ ...hideWhileSheetOpen(180), width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}
+              className="relative z-10 shrink-0 transition-[opacity,transform]"
+              style={{ ...hide(180, hiddenForClip), width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}
             >
               {showThumbnail && (
                 <CaptureSlot
@@ -133,6 +162,9 @@ export function MobileNav({
                   onClick={handleThumbnailClick}
                   elevated={false}
                   suppressMorph={suppressMorph}
+                  // pointer-events-none above stops a pointer and nothing else;
+                  // this is what takes the keyboard and the click sound with it.
+                  disabled={isRecording}
                 />
               )}
             </div>
@@ -143,7 +175,10 @@ export function MobileNav({
                 that has to be reachable in a single tap: it decides what the
                 shutter above it does. The shader is a look, and looks belong with
                 the parameters that shape them. */}
-            <div className="transition-[opacity,transform]" style={hideWhileSheetOpen(180)}>
+            {/* Leaves on the same 180ms and the same curve as the thumbnail,
+                which is the whole of why they are one gesture rather than two
+                things that happened at once. */}
+            <div className="transition-[opacity,transform]" style={hide(180, hiddenForClip)}>
               {videoSupported && (
                 <ModeTabs
                   mode={mode}
@@ -151,8 +186,14 @@ export function MobileNav({
                   layoutIdPrefix="mobile"
                   size="mobile"
                   // Switching to Image mid-clip would freeze the canvas halfway
-                  // through the recording.
+                  // through the recording. Kept even though the track is on its
+                  // way out — a faded-out control that is still focusable is
+                  // worse than a visible one.
                   disabled={isRecording}
+                  // But not dimmed with it: that dim is a second opacity curve
+                  // under the fade above, and it ran the track out ahead of the
+                  // thumbnail it is supposed to leave with.
+                  dimWhenDisabled={false}
                 />
               )}
             </div>
@@ -164,7 +205,7 @@ export function MobileNav({
               }}
               className="flex items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground transition-[color,opacity,transform] hoverFine:text-foreground active:scale-[0.97]"
               aria-label="Shader controls"
-              style={{ ...hideWhileSheetOpen(180), width: FILTERS_SIZE, height: FILTERS_SIZE }}
+              style={{ ...hide(180, sheetOpen), width: FILTERS_SIZE, height: FILTERS_SIZE }}
             >
               <span
                 aria-hidden
