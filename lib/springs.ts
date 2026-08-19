@@ -171,21 +171,35 @@ export const galleryEffects = {
    * The neighbour arriving in the deleted capture's place on *touch* — a full
    * slide, one screen wide, from the side of the strip it actually lives on.
    *
-   * Longer than anything else here because it is the only thing in the gallery
-   * that crosses the whole screen, and the curve is the one iOS uses for a
-   * full-screen push: nearly all the distance in the first half, then a long
-   * quiet settle. A strong ease-out over a viewport width is the difference
-   * between the strip stepping back and a card being thrown at you.
+   * Touch only, and it stays a slide: the captures really do lie side by side in
+   * a scroller here, so the strip stepping is the one true statement a delete on
+   * this surface can make. The desktop viewer has no side for a capture to come
+   * from and gets a reveal instead; see revealScale.
    *
-   * It outlasts the exit on purpose. The capture you deleted is gone by 220ms
-   * and the one that replaced it is still arriving, so the last thing the eye
-   * follows is the picture that stayed.
+   * The number was 300 and the curve was the iOS full-screen push — nearly all
+   * the distance in the first half, then a long quiet settle — on the argument
+   * that the arrival should outlast the exit so the last thing the eye follows
+   * is the picture that stayed. Measuring it killed both halves of that.
    *
-   * Touch only. The desktop viewer has no side for a capture to come from; see
-   * revealScale.
+   * The exit is a full-screen photograph sitting on top of this one, and it does
+   * not begin to fade until dismissFadeDelayMs: sampled on a 375px viewport, the
+   * ghost was still at opacity 1.00 at 98ms, by which point the arriving card
+   * had already travelled 156 of its 375px behind it. Every frame the old curve
+   * spent being expressive was a frame nobody could see. What was visible was
+   * the remainder — 23px of travel over the last 150ms — so a delete ended on a
+   * drift, and the exit had been finished since 189ms.
+   *
+   * So: the same 220ms as the exit, and the two halves end together. And an
+   * ease-in-out rather than an ease-out, which is the documented curve for
+   * something moving across the screen rather than entering it — this card is a
+   * strip stepping, not an element appearing. Its slow start is not a cost here,
+   * because the slow start is the part behind the ghost, and the responsiveness
+   * an ease-out would have bought is already paid for by the exit, which begins
+   * moving on the press frame. Half the distance is still unspent at 110ms,
+   * which is where the ghost finally lets go of it.
    */
-  replaceMs: 300,
-  replaceEase: "cubic-bezier(0.32, 0.72, 0, 1)",
+  replaceMs: 220,
+  replaceEase: "cubic-bezier(0.77, 0, 0.175, 1)",
   /**
    * How long the backdrop lingers after the *last* capture has dissolved.
    *

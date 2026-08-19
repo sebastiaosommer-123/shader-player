@@ -52,7 +52,6 @@ export function WallpaperGalleryMobile({
   const captureCount = captures.length
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
-  const [imageVisible, setImageVisible] = useState(true)
   // Suppresses the parallax while the shared element is in flight. True from the
   // first frame, since the gallery only ever mounts into an opening morph.
   const [isMorphing, setIsMorphing] = useState(true)
@@ -403,18 +402,14 @@ export function WallpaperGalleryMobile({
           photo. */}
       {isPresent && (
         <div className="fixed inset-0 overflow-hidden" onClick={handleClose}>
-          {/* The fade rides on this wrapper rather than on the scroller itself.
-              Blossom writes its own inline `transition` onto the scroller to
-              drive the overflow swap during a drag, and an inline declaration
-              wins over anything we could set from a class — so a transition left
-              on that element is simply overwritten and the fade snaps. */}
-          <div
-            className="absolute inset-0"
-            style={{
-              opacity: imageVisible ? 1 : 0,
-              transition: prefersReducedMotion ? "opacity 150ms ease-in-out" : "opacity 180ms ease-out",
-            }}
-          >
+          {/* Positioning box for the scroller, and nothing more. It used to carry
+              a fade — held here rather than on the scroller because Blossom
+              writes its own inline `transition` onto that element during a drag
+              and would overwrite ours — but whatever once drove it was removed,
+              and `imageVisible` sat hardcoded true with a transition that could
+              never fire. Put the fade back on this element if it is ever wanted
+              again; the reason it cannot live one level down still holds. */}
+          <div className="absolute inset-0">
             {/* Every capture is on screen at once, in a real scroll container, so
                 the swipe, the trackpad and the arrow keys all come for free — and
                 the parallax has a scroll position to read. */}
