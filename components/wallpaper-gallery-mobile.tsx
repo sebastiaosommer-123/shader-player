@@ -19,7 +19,7 @@ import { toast } from "sonner"
 import { galleryMorph } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 import { dismissCapture } from "@/components/capture-dismissal"
-import { useCaptureSlideIn } from "@/hooks/use-capture-slide-in"
+import { useCaptureReplacement } from "@/hooks/use-capture-replacement"
 import { GalleryThumbnailStrip } from "@/components/gallery-thumbnail-strip"
 
 const galleryButtonClass =
@@ -57,7 +57,7 @@ export function WallpaperGalleryMobile({
   // first frame, since the gallery only ever mounts into an opening morph.
   const [isMorphing, setIsMorphing] = useState(true)
 
-  const { sliding, slideStyle, beginSlideIn } = useCaptureSlideIn()
+  const { replacing, replacementStyle, beginReplacement } = useCaptureReplacement("slide")
 
   const carouselRef = useRef<BlossomCarouselHandle>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -306,7 +306,7 @@ export function WallpaperGalleryMobile({
     // jumps there and no card is ever offset.
     setCurrentIndex(stepsBack ? currentIndex - 1 : 0)
     if (prefersReducedMotion) return
-    beginSlideIn(stepsBack ? -1 : 1)
+    beginReplacement(stepsBack ? -1 : 1)
   }
 
   const handleClose = () => {
@@ -422,7 +422,7 @@ export function WallpaperGalleryMobile({
               ref={carouselRef}
               className="gallery-carousel"
               data-morphing={isMorphing ? "true" : undefined}
-              data-deleting={sliding ? "true" : undefined}
+              data-deleting={replacing ? "true" : undefined}
               onScroll={handleScroll}
               aria-label="Captured frames"
             >
@@ -448,7 +448,7 @@ export function WallpaperGalleryMobile({
                       next capture ever showing itself. */}
                   <div
                     className="gallery-card"
-                    style={sliding && index === currentIndex ? slideStyle : undefined}
+                    style={replacing && index === currentIndex ? replacementStyle : undefined}
                   >
                     {/* Every capture is sized to the letterboxed rect it actually
                         occupies rather than stretched across the slide and left

@@ -84,11 +84,14 @@ export const galleryMorph = {
  * and these captures are soft gradients with none, so it came apart into static
  * rather than into pieces.
  *
- * What was left after those was a capture that dimmed 3% and blinked out over a
- * neighbour that was simply *already there*, which is not restraint — it is a
- * cut. So the money is spent on the one thing a delete actually has to say: the
- * frame you removed goes, and the strip steps back onto the one before it. Two
- * plain properties each, no effect, and the whole thing is over in 300ms.
+ * The two galleries no longer share an entrance, and that is the correction this
+ * block exists to record. Both used to: one full screen of horizontal travel,
+ * out of the same hook. It is true on touch, where the captures lie side by side
+ * in a scroller and the neighbour really is one screen out. It was never true on
+ * desktop, which has a vertical rail and a viewer that hard-cuts between
+ * captures — so the replacement crossed in from an axis that surface does not
+ * have, from off screen, while the very capture it claimed to be was sitting
+ * visible in the rail the whole time. See revealScale.
  */
 export const galleryEffects = {
   /**
@@ -118,19 +121,55 @@ export const galleryEffects = {
    * left 0.97 — and dead frames immediately after a press read as latency, not
    * as restraint. So the transform gets the ease-out it wants, and the fade
    * gets the hold it wants from a delay instead of from a curve.
+   *
+   * Also the desktop reveal's curve, deliberately: the two halves of that delete
+   * are one gesture on one axis, and a shared curve is what keeps them from
+   * reading as two events that happen to overlap.
    */
   dismissEase: "cubic-bezier(0.23, 1, 0.32, 1)",
   /**
    * How long the capture holds full opacity while it is already shrinking.
    *
-   * Two frames, which is all the hold ever needed to be: long enough that the
-   * picture is unmistakably the thing that moved first, short enough that it is
-   * gone well before the capture replacing it lands.
+   * Four frames at 60Hz, which is all the hold ever needed to be: long enough
+   * that the picture is unmistakably the thing that moved first, short enough
+   * that it is gone well before the capture replacing it has settled.
    */
   dismissFadeDelayMs: 60,
   /**
-   * The neighbour arriving in the deleted capture's place — a full slide, one
-   * screen wide, from the side of the strip it actually lives on.
+   * The neighbour stepping forward into the slot, on desktop.
+   *
+   * Not a slide, because the desktop viewer is not a strip. It is one slot with
+   * a vertical rail of thumbnails beside it, and the wheel steps between
+   * captures on a hard cut — nothing ever travels into that slot, so there is no
+   * spatial habit for an entrance to be consistent with. What the viewer *is* is
+   * a stack: the capture you are looking at, and the rest behind it. Delete the
+   * top one and the next is revealed, because it was already there.
+   *
+   * So the entrance is the only move that is physically true here — the card
+   * behind coming forward as the one in front falls back. The exit is already
+   * receding on this axis (1 → 0.8); this is the same axis in the other
+   * direction, on the same curve. Two properties, two elements, one gesture.
+   *
+   * 0.98 and not less. The whole distance is a hair, and it has to be: the
+   * capture is not entering, it is being uncovered, and anything deeper starts
+   * to look like it flew in from behind the screen. No opacity on it either —
+   * these captures are near-identical soft gradients, and fading one up over
+   * another is how you get mush instead of a replacement.
+   */
+  revealScale: 0.98,
+  /**
+   * Shorter than the exit on purpose, and starting on the same frame.
+   *
+   * The reverse of the reasoning replaceMs gives for the touch gallery. There,
+   * the arrival outlasts the exit because it crosses the whole screen and is the
+   * thing worth following. Here the arrival is 2% of a scale — it has nothing to
+   * say on its own, and its whole job is to be finished and out of the way while
+   * the capture you deleted is still visibly leaving.
+   */
+  revealMs: 200,
+  /**
+   * The neighbour arriving in the deleted capture's place on *touch* — a full
+   * slide, one screen wide, from the side of the strip it actually lives on.
    *
    * Longer than anything else here because it is the only thing in the gallery
    * that crosses the whole screen, and the curve is the one iOS uses for a
@@ -141,6 +180,9 @@ export const galleryEffects = {
    * It outlasts the exit on purpose. The capture you deleted is gone by 220ms
    * and the one that replaced it is still arriving, so the last thing the eye
    * follows is the picture that stayed.
+   *
+   * Touch only. The desktop viewer has no side for a capture to come from; see
+   * revealScale.
    */
   replaceMs: 300,
   replaceEase: "cubic-bezier(0.32, 0.72, 0, 1)",

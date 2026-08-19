@@ -18,7 +18,7 @@ import { galleryMorph } from "@/lib/springs"
 import { closeFlightFrom } from "@/components/gallery-close-flight"
 import { cn } from "@/lib/utils"
 import { dismissCapture } from "@/components/capture-dismissal"
-import { useCaptureSlideIn } from "@/hooks/use-capture-slide-in"
+import { useCaptureReplacement } from "@/hooks/use-capture-replacement"
 import { GalleryThumbnailStrip } from "@/components/gallery-thumbnail-strip"
 
 const galleryButtonClass =
@@ -64,7 +64,7 @@ export function WallpaperGalleryDesktop({
       ? document.activeElement
       : null,
   )
-  const { slideStyle, beginSlideIn } = useCaptureSlideIn()
+  const { replacementStyle, beginReplacement } = useCaptureReplacement("reveal")
   // The capture as it is actually painted, for a close that has to draw its own
   // collapse. See handleClose.
   const captureRef = useRef<HTMLImageElement>(null)
@@ -278,16 +278,22 @@ export function WallpaperGalleryDesktop({
    * over the top of a list that has already changed. The outgoing frame recedes
    * and fades from the app root (see CaptureDismissal) because removing the last
    * capture closes the gallery on this same frame and the exit has to outlive
-   * that unmount. The incoming one is stepped to here.
+   * that unmount. The incoming one is revealed here.
    *
-   * Which way the strip steps is the decision worth writing down. The index is
-   * moved *back* one rather than left where it is, so what fills the slot is the
-   * capture before the deleted one and it enters from the left, where it has
-   * been sitting all along. Holding the index instead would pull the *next*
-   * capture leftwards into the gap, which is the correct thing for a list and the
-   * wrong thing for a strip of film: nothing on a strip moves backwards. The
-   * oldest capture is the one case with nothing behind it, so there the newer one
-   * comes in from the right and the strip steps forward for once.
+   * Which capture fills the slot is still worth writing down, even though it is
+   * no longer also a direction. The index is moved *back* one rather than left
+   * where it is, so what you land on is the capture that was already behind this
+   * one — the next card down the stack, and the thumbnail directly beneath the
+   * selected one in the rail. Holding the index instead pulls the *newer*
+   * capture into the gap, which is the correct thing for a list and the wrong
+   * thing for a stack of photographs: you take one off the top and see what it
+   * was covering. The oldest capture is the one case with nothing behind it, so
+   * there the newer one takes the slot instead.
+   *
+   * Nothing is passed on about direction, because there is none to pass. The
+   * rail is vertical, the wheel hard-cuts between captures, and the replacement
+   * is uncovered exactly where it already was — see galleryEffects.revealScale
+   * for why this viewer gets a reveal where the touch gallery gets a slide.
    */
   const handleDelete = () => {
     if (!currentCapture) return
@@ -312,7 +318,7 @@ export function WallpaperGalleryDesktop({
     currentIndexRef.current = nextIndex
     setCurrentIndex(nextIndex)
     if (prefersReducedMotion) return
-    beginSlideIn(stepsBack ? -1 : 1)
+    beginReplacement()
   }
 
   const handleClose = () => {
@@ -406,13 +412,19 @@ export function WallpaperGalleryDesktop({
           onMouseLeave={showsVideo ? playback.hideControls : undefined}
         >
           {currentCapture && (
-            // A delete's arrival rides on this wrapper instead of the image.
+            // A delete's reveal rides on this wrapper instead of the image.
             // The image is a projection node, so Framer owns its transform for
             // the length of the gallery morph; a second transform on the same
             // element would be overwritten mid-flight and fight the spring.
+            //
+            // Which means the reveal scales about the *viewer's* centre, and the
+            // capture is centred 56px left of that — half the rail's `right-28`.
+            // At 0.98 the capture therefore drifts about a pixel as well as
+            // growing, which is nothing. Scale it any harder and that stops
+            // being true; move the origin before you do.
             <div
               className="absolute inset-0"
-              style={slideStyle}
+              style={replacementStyle}
             >
               {/* Two nested layoutIds, and the pair is the whole trick. The card
                   is the aperture: it travels from the thumbnail's rounded square

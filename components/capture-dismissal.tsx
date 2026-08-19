@@ -23,12 +23,13 @@ let nextKey = 0
  * suited the material: a dispersal needs edges to read as fragments, and a soft
  * gradient has none, so it came apart into static rather than pieces.
  *
- * Only ever half of a delete. The other half — the capture before it sliding
- * across to take the slot — is drawn by the gallery itself, which is the only
- * place that knows where the strip is. This one is pinned to the rect the
- * deleted capture occupied and does not travel with it: the picture leaving and
- * the picture arriving are two events, and giving them the same motion would
- * make them one.
+ * Only ever half of a delete. The other half — the capture behind it taking the
+ * slot — is drawn by the gallery itself, which is the only place that knows what
+ * shape its own list is: the touch strip slides the neighbour across, the
+ * desktop stack uncovers it in place. This one is pinned to the rect the deleted
+ * capture occupied and does not travel with it either way. On touch that keeps
+ * the picture leaving and the picture arriving legible as two events; on desktop
+ * the receding is one half of a single gesture that the reveal completes.
  *
  * The deletion itself commits on the press, before either of them starts.
  *
@@ -101,8 +102,8 @@ export function CaptureDismissal() {
           transformOrigin: "center",
           // The two properties are given the same curve but not the same clock —
           // see dismissFadeDelayMs. The shrink starts on the press frame; the
-          // fade waits two frames so the capture is visibly the thing that moved
-          // before it is allowed to start disappearing.
+          // fade waits four frames so the capture is visibly the thing that
+          // moved before it is allowed to start disappearing.
           transition:
             `transform ${galleryEffects.dismissMs}ms ${galleryEffects.dismissEase}, ` +
             `opacity ${galleryEffects.dismissMs - galleryEffects.dismissFadeDelayMs}ms ` +

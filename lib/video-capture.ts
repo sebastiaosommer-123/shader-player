@@ -4,7 +4,7 @@
  * The stateful half — the recorder's lifetime, the clock, the auto-stops — is
  * hooks/use-video-recorder.ts. This file is the part with no lifetime: what the
  * browser can encode, how fast, at what bitrate, and under what extension. Same
- * split as lib/canvas-capture.ts against hooks/use-capture-slide-in.ts.
+ * split as lib/canvas-capture.ts against hooks/use-capture-replacement.ts.
  */
 
 /**
