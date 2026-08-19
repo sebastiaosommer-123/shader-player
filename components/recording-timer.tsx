@@ -25,6 +25,11 @@ interface RecordingTimerProps {
  *
  * Space Mono comes from `*` in app/globals.css, and being monospaced the digits
  * already hold their column without tabular-nums.
+ *
+ * Centred on the window, not on the canvas — the same frame of reference
+ * FloatingToolbar settled on, and for the same reason. The two are the only
+ * floating chrome on screen for the whole of a recording, and centring this one
+ * on the artwork left the timecode and the bar below it half a sidebar apart.
  */
 export function RecordingTimer({ elapsedMs }: RecordingTimerProps) {
   const prefersReducedMotion = useReducedMotion()
@@ -50,8 +55,26 @@ export function RecordingTimer({ elapsedMs }: RecordingTimerProps) {
     <motion.div
       role="timer"
       aria-live="off"
-      className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/40 px-2.5 py-1 text-[13px] leading-none text-white backdrop-blur-sm"
-      style={{ top: "max(12px, env(safe-area-inset-top, 0px))" }}
+      className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-full bg-black/40 px-2.5 py-1.5 text-[13px] leading-none text-white backdrop-blur-sm"
+      style={{
+        top: "max(12px, env(safe-area-inset-top, 0px))",
+        // Window centre, expressed from inside the canvas: this element's
+        // containing block starts at the window's left edge in both layouts,
+        // so 50vw lands on the middle of the window whatever the sidebar is
+        // doing — no --sidebar-width to read, and it tracks a drag for free.
+        // On mobile there is no sidebar, the canvas is the window, and this is
+        // simply 50% again.
+        //
+        // The min() is the one case where the window's middle is not over the
+        // artwork: a narrow desktop window with the sidebar dragged out wide
+        // (below ~850px at the 400px maximum). The timecode stops at the
+        // canvas's right edge rather than sliding under the clip — off the
+        // window's centre, but a visible timecode beats an aligned half of one.
+        // 36px is half the pill plus a margin; the pill's width is fixed,
+        // since MAX_RECORDING_MS caps the readout at four characters. It moves
+        // with the horizontal padding above — 26px of half-pill at px-2.5.
+        left: "min(50vw, 100% - 36px)",
+      }}
       initial={prefersReducedMotion ? false : { opacity: 0, y: -2 }}
       animate={{ opacity: 1, y: 0 }}
       exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -2 }}
