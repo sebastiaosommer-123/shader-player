@@ -220,3 +220,123 @@ export const galleryEffects = {
 // the timers in step with the tokens above.
 export const exitFallbackMs = (tier: { exit: { duration: number } }) =>
   Math.round(tier.exit.duration * 1000) + 100;
+
+/**
+ * Mobile only: the viewfinder stepping back to make room for the controls.
+ *
+ * This replaced a bottom sheet, and the replacement is the whole point. A sheet
+ * slides *over* the canvas, which is the one thing you are looking at while you
+ * drag a slider. Here nothing slides over anything: the canvas scales down from
+ * its top edge, and the controls occupy the room it vacates.
+ *
+ * **Scale, not layout.** Three reasons, and all three are load-bearing:
+ *
+ * 1. Aspect ratio. A height change re-renders the shader into a shorter
+ *    full-width box; a uniform scale gives a smaller copy of the same picture,
+ *    with black gutters either side. The second is what the design asks for —
+ *    the artwork is not reframed, it is set back.
+ * 2. The compositor. `height` is layout + paint + composite on the main thread,
+ *    against a WebGL loop that is already drawing every frame.
+ * 3. No buffer churn. ShaderCanvas observes its <canvas> with a ResizeObserver
+ *    that reallocates and *wipes* the drawing buffer on every callback. RO
+ *    reports the layout box, which a transform does not touch — so it stays
+ *    silent for the whole transition. A height animation would have wiped and
+ *    redrawn the buffer once per frame.
+ *
+ * `transform-origin: top center`, so the top edge never moves and the gutters
+ * open symmetrically.
+ */
+export const controlsSplit = {
+  /**
+   * The share of the viewport the viewfinder keeps while the controls are open.
+   *
+   * One number for both halves: the panel's top is 50dvh in CSS, and the canvas
+   * scale is (rootHeight × this) ÷ the canvas box's own layout height. The page
+   * root is exactly 100dvh tall, so the two agree by construction and the
+   * canvas's bottom edge lands on the panel's top edge with no seam to tune.
+   *
+   * A fraction rather than a fixed panel height, so a short phone and a tall one
+   * both get a viewfinder in proportion to their screen rather than one of them
+   * getting a stamp. In practice the scale lands between 0.61 and 0.65 across
+   * every phone size, which is the range the design was drawn at.
+   */
+  openFraction: 0.5,
+
+  /**
+   * Air between the viewfinder's bottom edge and the panel's top edge.
+   *
+   * Taken out of the canvas, not out of the panel: the panel's height is what
+   * the parameters have to live in, and it is already the tighter of the two on
+   * a short phone. The canvas gives up 8px of an already-scaled box, which costs
+   * it about a hundredth of a point of scale.
+   *
+   * The two surfaces are the same colour, so this is not a seam anyone can point
+   * at — it is the difference between the artwork *ending* and the artwork being
+   * cropped by the thing below it.
+   */
+  canvasGapPx: 8,
+
+  /**
+   * The house ease-out, and it is the right one even though this is an element
+   * *moving on screen* rather than entering — which normally argues for an
+   * ease-in-out.
+   *
+   * The move is the response to the press. An ease-in-out is dead for its first
+   * third, and dead frames immediately after a press read as latency, not as
+   * restraint — the same argument galleryEffects.dismissEase makes above, for
+   * the same reason.
+   *
+   * No spring, and no bounce. The return leg ends at scale(1), which is the
+   * canvas at full size against the viewport edges and the control bar: an
+   * overshoot has nowhere to go but off screen and underneath the bar. Bouncing
+   * only on the way in would be worse — one gesture, two personalities.
+   */
+  ease: "cubic-bezier(0.23, 1, 0.32, 1)",
+
+  /**
+   * Enter: you press, the bar clears, the viewfinder pulls back, the controls
+   * arrive. The bar's own departure is not here — it is the `hide()` helper in
+   * MobileNav, unchanged, because the bar already had one way of putting a
+   * control away and this is not a reason to give it a second.
+   *
+   * The panel is held back until the canvas has covered most of its distance.
+   * On this curve that is about 85% at 110ms, so the room exists before anything
+   * is put in it.
+   */
+  enter: {
+    canvasMs: 280,
+    panelMs: 180,
+    panelDelayMs: 110,
+  },
+
+  /**
+   * Exit: the mirror, and about 17% quicker — the same relationship the sheet
+   * this replaced had between its 250ms in and 200ms out.
+   *
+   * Order is reversed, and that ordering is the mechanism rather than a flourish:
+   * the panel is opaque and sits above the canvas, so it has to be most of the
+   * way gone before the canvas grows back into its space. Leaving on 100ms
+   * against the canvas's 30ms delay buys exactly that.
+   */
+  exit: {
+    panelMs: 100,
+    canvasMs: 200,
+    canvasDelayMs: 30,
+    /**
+     * How long the bar waits before coming back. The bar is the destination, so
+     * it arrives last — and more practically, fading it up underneath a panel
+     * that is still fading down is two crossfading planes in the same place.
+     */
+    barDelayMs: 60,
+  },
+
+  /**
+   * How far the panel travels on the way in, in px. Eight, and no more.
+   *
+   * The canvas is the only thing in this transition that really moves; the panel
+   * materialises in the room the canvas left. A panel sliding up while the
+   * canvas shrinks down is two elements converging on one axis — and it would
+   * re-import the very sheet vocabulary this change exists to remove.
+   */
+  panelTravelPx: 8,
+} as const;

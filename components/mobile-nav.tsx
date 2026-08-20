@@ -1,14 +1,14 @@
 "use client"
 
-import { useState } from "react"
 import type { ShaderParams } from "@/lib/shader-uniforms"
 import type { Capture } from "@/lib/types"
-import { ControlsSheet } from "./controls-sheet"
+import { ControlsPanel } from "./controls-panel"
 import { CaptureSlot } from "./capture-slot"
 import { ShutterButton } from "./shutter-button"
 import { ModeTabs, type CaptureMode } from "./mode-tabs"
 import { playDigitalClick } from "@/lib/audio-feedback"
 import { useReducedMotion, type MotionValue } from "framer-motion"
+import { controlsSplit } from "@/lib/springs"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 /** Matches the iOS camera proportions: round thumb, round control. The shutter
@@ -38,6 +38,15 @@ interface MobileNavProps {
   onThumbnailClick: (captureIndex: number) => void
   /** Passed straight through to the thumbnail; see CaptureThumbnail. */
   suppressMorph?: boolean
+  /**
+   * Owned by the page, not by this bar.
+   *
+   * Opening the controls scales the shader canvas down to make room for them,
+   * and the canvas is the page's. The bar renders the button that sets this and
+   * the panel that reads it, but it is not where the flag can live.
+   */
+  controlsOpen: boolean
+  onControlsOpenChange: (open: boolean) => void
 }
 
 export function MobileNav({
@@ -54,8 +63,9 @@ export function MobileNav({
   recordingProgress,
   onThumbnailClick,
   suppressMorph,
+  controlsOpen,
+  onControlsOpenChange,
 }: MobileNavProps) {
-  const [sheetOpen, setSheetOpen] = useState(false)
   const prefersReducedMotion = useReducedMotion()
   const isMobile = useIsMobile()
 
@@ -63,7 +73,7 @@ export function MobileNav({
    * The bar's one way of putting a control away: fade it, and step it back 3%.
    *
    * Written once and taken by everything that leaves, because there is more than
-   * one reason to leave now — the sheet taking the screen, and a recording
+   * one reason to leave now — the controls panel taking the screen, and a recording
    * starting — and a bar with two different exits reads as two bars. The scale
    * is what keeps it from being a light switch: nothing here vanishes from full
    * size, it withdraws. Dropped under reduced motion, where the fade alone still
@@ -76,12 +86,22 @@ export function MobileNav({
    * Nothing reflows on the way out. Every slot in the row is fixed width, so the
    * controls go from their places rather than the row closing over them, and
    * they come back to the same pixels.
+   *
+   * **Leaving is immediate; coming back waits.** The delay is one-directional
+   * and it is the same number whatever put the control away, because the rule is
+   * about the bar rather than about the reason: the bar is the destination, so
+   * it is the last thing to arrive. Concretely it stops the controls fading up
+   * underneath a controls panel that is still fading down — two crossfading
+   * planes in the same place — and when a recording ends instead, the beat reads
+   * as the clip resolving rather than as lag.
    */
   const hide = (duration: number, hidden: boolean) => ({
     opacity: hidden ? 0 : 1,
     transform: hidden && !prefersReducedMotion ? "scale(0.97)" : "scale(1)",
     pointerEvents: hidden ? ("none" as const) : ("auto" as const),
     transitionDuration: prefersReducedMotion ? "0ms" : `${duration}ms`,
+    transitionDelay:
+      hidden || prefersReducedMotion ? "0ms" : `${controlsSplit.exit.barDelayMs}ms`,
     transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
   })
 
@@ -91,11 +111,11 @@ export function MobileNav({
    * The iOS camera clears its mode carousel the instant a recording starts, and
    * this is the same idea: for the length of a clip the thumbnail and the mode
    * track are not dimmed versions of themselves, they are gone, and what is left
-   * on the bar is the one control the moment is about. The sheet is the other
-   * reason either of them leaves, and hidden is hidden — the two states overlap
-   * happily, since the sheet stays openable mid-clip on purpose.
+   * on the bar is the one control the moment is about. The controls panel is the
+   * other reason either of them leaves, and hidden is hidden — the two states
+   * overlap happily, since the panel stays openable mid-clip on purpose.
    */
-  const hiddenForClip = sheetOpen || isRecording
+  const hiddenForClip = controlsOpen || isRecording
 
   const latest = captures[captures.length - 1]
   const showThumbnail = isMobile && !!latest
@@ -127,7 +147,7 @@ export function MobileNav({
             isRecording={isRecording}
             progress={recordingProgress}
             className="transition-[opacity,transform]"
-            style={hide(150, sheetOpen)}
+            style={hide(150, controlsOpen)}
           />
 
           {/* The outer slots are the same width, which is what keeps the tabs
@@ -169,7 +189,7 @@ export function MobileNav({
               )}
             </div>
 
-            {/* The shader picker used to live here. It moved into the sheet when
+            {/* The shader picker used to live here. It moved into the panel when
                 the capture mode arrived, because only one track fits between the
                 thumbnail and the filters button — and of the two, mode is the one
                 that has to be reachable in a single tap: it decides what the
@@ -201,11 +221,11 @@ export function MobileNav({
             <button
               onClick={() => {
                 playDigitalClick("strong")
-                setSheetOpen(true)
+                onControlsOpenChange(true)
               }}
               className="flex items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground transition-[color,opacity,transform] hoverFine:text-foreground active:scale-[0.97]"
               aria-label="Shader controls"
-              style={{ ...hide(180, sheetOpen), width: FILTERS_SIZE, height: FILTERS_SIZE }}
+              style={{ ...hide(180, controlsOpen), width: FILTERS_SIZE, height: FILTERS_SIZE }}
             >
               <span
                 aria-hidden
@@ -220,14 +240,14 @@ export function MobileNav({
         </div>
       </div>
 
-      <ControlsSheet
+      <ControlsPanel
         params={params}
         setParams={setParams}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
+        open={controlsOpen}
+        onOpenChange={onControlsOpenChange}
         shaderId={shaderId}
         onShaderChange={onShaderChange}
-        // The sheet stays openable mid-recording — the parameters inside it are
+        // The panel stays openable mid-recording — the parameters inside it are
         // live, and that is the point — but the shader picker in it is not.
         isRecording={isRecording}
       />

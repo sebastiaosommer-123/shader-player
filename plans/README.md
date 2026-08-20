@@ -17,6 +17,7 @@ explicitly describes the expected earlier-plan changes.
 | [008](008-reduced-motion-parameter-overlays.md) | Remove parameter-control movement under reduced motion | MEDIUM | DONE | 006 |
 | [009](009-video-recording.md) | Record the canvas as video | — | DONE | supersedes part of 001 |
 | [010](010-gallery-video-player.md) | Give recordings a transport in the gallery | — | DONE | 009 |
+| [011](011-mobile-controls-split.md) | Split the mobile screen between the viewfinder and the controls | — | DONE | — |
 
 ## Execution status
 
@@ -35,6 +36,11 @@ what makes a recording something you can do more with than watch. It also
 records a hazard worth carrying forward — the Browser pane runs `document.hidden`
 with rAF suspended, so any recording made through it encodes almost no frames and
 `video.duration` comes back a fraction of the take.
+
+Plan 011 is a layout change rather than an animation fix, and is recorded here
+because it moves motion decisions the earlier plans assumed: the mobile controls
+no longer slide over the canvas, and the canvas itself now animates. It also
+reverses two documented decisions — see its own "Two decisions reversed".
 
 ## Status values
 

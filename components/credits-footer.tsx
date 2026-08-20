@@ -2,7 +2,7 @@ import { AppearanceToggle } from "./appearance-toggle"
 
 interface CreditsFooterProps {
   /**
-   * The mobile sheet omits the appearance toggle: its own chrome is pinned
+   * The mobile panel omits the appearance toggle: its own chrome is pinned
    * `dark`, so the only surface the setting still reaches from there is the
    * wallpaper gallery. Not worth a control in a sheet that can't show its own
    * effect — light/dark stays a desktop choice.

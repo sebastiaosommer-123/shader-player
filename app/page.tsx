@@ -19,9 +19,10 @@ import { useVideoRecorder } from "@/hooks/use-video-recorder"
 import { RecordingTimer } from "@/components/recording-timer"
 import { CaptureFlash } from "@/components/capture-flash"
 import { Toaster } from "@/components/ui/sonner"
-import { captureFlash } from "@/lib/springs"
+import { captureFlash, controlsSplit } from "@/lib/springs"
 import { getShaderConfig } from "@/lib/shader-configs"
 import { useResizableSidebar } from "@/hooks/use-resizable-sidebar"
+import { useControlsSplit } from "@/hooks/use-controls-split"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 
@@ -95,6 +96,25 @@ export default function Home() {
   // than a boolean because two captures in quick succession must not collapse
   // into one blink.
   const [flashKey, setFlashKey] = useState(0)
+
+  /**
+   * Whether the mobile controls have the bottom half of the screen.
+   *
+   * Owned here rather than in MobileNav, where it used to live as `sheetOpen`,
+   * because it is no longer only the bar's business: opening the controls scales
+   * the canvas below, and the canvas is this file's.
+   */
+  const [controlsOpen, setControlsOpen] = useState(false)
+  const { rootRef, canvasBoxRef, scale: canvasScale } = useControlsSplit(isMobile)
+
+  // Crossing to desktop with the panel open would leave a dialog pinned over a
+  // layout that has a sidebar for exactly this. Nothing to animate on the way
+  // out: the surface it belonged to is already gone.
+  useEffect(() => {
+    if (!isMobile) setControlsOpen(false)
+  }, [isMobile])
+
+  const isCanvasScaled = isMobile && controlsOpen && canvasScale !== null
 
   // The encoder's thread costs about a tenth of a second to start, and it is
   // started by whatever asks it for the first PNG — which, left alone, is the
@@ -309,6 +329,7 @@ export default function Home() {
     // element instead, seeded pre-paint and maintained by useResizableSidebar;
     // the canvas just takes whatever flex-1 leaves over.
     <div
+      ref={rootRef}
       // `dark` on the root below md, which is the one place it can go and cover
       // everything: mobile has no light mode at all. The bar, the sheet and the
       // canvas already pinned themselves dark individually, but that left every
@@ -323,7 +344,15 @@ export default function Home() {
       //
       // This overrides the rendered palette, not the stored preference: a theme
       // chosen on desktop is still there on return.
-      className={cn("h-screen w-screen flex flex-col md:flex-row overflow-hidden", isMobile && "dark")}
+      // `bg-background` rides along with it, and it is not decoration. Once the
+      // canvas scales down it stops covering its own box, and the gutters either
+      // side of it fall through to whatever is behind — which without this is
+      // <body>, painted from the *page* theme. A phone on a light system theme
+      // would frame the artwork in white.
+      className={cn(
+        "h-screen w-screen flex flex-col md:flex-row overflow-hidden",
+        isMobile && "dark bg-background",
+      )}
       style={{ height: "100dvh" } as CSSProperties}
     >
       {/* Shader Canvas.
@@ -332,19 +361,60 @@ export default function Home() {
           scopes the dark palette here alone — it cannot go on the outer flex
           container without dragging the desktop sidebar into it too. Transparent
           from md up, where the canvas is square and fills its box. */}
-      <div className="dark flex-1 min-h-0 bg-background md:bg-transparent">
-        {/* overflow-hidden is what actually clips the canvas: the radius sits on
-            this wrapper, not on the <canvas> itself. */}
-        <div className="relative h-full w-full overflow-hidden rounded-[12px] md:rounded-none">
-          <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} isFrozen={isFrozen} />
-          {/* In here rather than over the whole page, so the blink is the
-              viewfinder's and not the app's: the chrome is the camera body and
-              stays put. Being inside the clip also gets it the artwork's exact
-              rounded corners for free. */}
-          {flashKey > 0 && <CaptureFlash key={flashKey} isMobile={isMobile} />}
+      <div ref={canvasBoxRef} className="dark flex-1 min-h-0 bg-background md:bg-transparent">
+        {/* The unscaled box, and the reason there are three elements here rather
+            than the two there used to be. It is the frame of reference for
+            anything that must keep its size while the viewfinder steps back. */}
+        <div className="relative h-full w-full">
+          {/* overflow-hidden is what actually clips the canvas: the radius sits
+              on this wrapper, not on the <canvas> itself.
+
+              And this is the element that scales. `transform-origin: top center`
+              keeps the top edge still and opens the gutters symmetrically, which
+              is the whole shape of the gesture. The radius scales with it, from
+              12px to about 7.5 — correct, and not a rounding error: a card that
+              has moved away has smaller corners. */}
+          <div
+            className="absolute inset-0 overflow-hidden rounded-[12px] md:rounded-none"
+            style={{
+              transformOrigin: "top center",
+              transform: isCanvasScaled ? `scale(${canvasScale})` : undefined,
+              transitionProperty: "transform",
+              transitionDuration: prefersReducedMotion
+                ? "0ms"
+                : `${controlsOpen ? controlsSplit.enter.canvasMs : controlsSplit.exit.canvasMs}ms`,
+              // Asymmetric on purpose. On the way in the canvas moves first and
+              // the panel follows it into the room; on the way out the panel has
+              // to be most of the way gone before the canvas grows back through
+              // it, so the canvas is the one that waits.
+              transitionDelay:
+                prefersReducedMotion || controlsOpen
+                  ? "0ms"
+                  : `${controlsSplit.exit.canvasDelayMs}ms`,
+              transitionTimingFunction: controlsSplit.ease,
+            }}
+          >
+            <ShaderCanvas ref={shaderCanvasRef} params={params} shaderId={shaderId} isFrozen={isFrozen} />
+            {/* In here rather than over the whole page, so the blink is the
+                viewfinder's and not the app's: the chrome is the camera body and
+                stays put. Being inside the clip also gets it the artwork's exact
+                rounded corners for free — and inside the scale, which is right:
+                the flash is the frame blinking, so it is whatever size the frame
+                currently is. */}
+            {flashKey > 0 && <CaptureFlash key={flashKey} isMobile={isMobile} />}
+          </div>
+
           {/* The timecode, in the viewfinder rather than over the page — the same
               rule the flash above follows, and where a camera puts it anyway.
-              Not in the recording; see RecordingTimer. */}
+              Not in the recording; see RecordingTimer.
+
+              Outside the scale, though, and that is what the extra element is
+              for. A timecode is a readout, not part of the picture: taken down
+              to 62% it is eight pixels tall and unreadable. It does not have to
+              move to stay out of it — its `top` already sits on the transform
+              origin's row, and its `left: min(50vw, …)` resolves to the origin's
+              own column on mobile, so leaving it here parks it exactly where the
+              scaled viewfinder's top edge is. */}
           <AnimatePresence>
             {recorder.isRecording && (
               <RecordingTimer key="recording-timer" elapsedMs={recorder.elapsedMs} />
@@ -378,6 +448,8 @@ export default function Home() {
         captures={captures}
         onThumbnailClick={handleThumbnailClick}
         suppressMorph={!!closeFlight}
+        controlsOpen={controlsOpen}
+        onControlsOpenChange={setControlsOpen}
       />
 
       {/* Desktop's floating control bar. A sibling of the canvas, never a child:

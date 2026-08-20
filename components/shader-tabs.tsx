@@ -8,7 +8,7 @@ interface ShaderTabsProps {
   onShaderChange: (shaderId: string) => void
   /**
    * One prefix per instance. There are two of these mounted at once — the
-   * desktop toolbar's, and the one in the mobile controls sheet — and the bars
+   * desktop toolbar's, and the one in the mobile controls panel — and the bars
    * are only CSS-hidden, never unmounted. See SegmentedTabs.
    */
   layoutIdPrefix: string

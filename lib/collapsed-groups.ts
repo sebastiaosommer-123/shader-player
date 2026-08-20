@@ -8,8 +8,8 @@ const STORAGE_KEY = "shader-player:collapsed-groups"
  * config later shows up open instead of hidden.
  *
  * This lives in a module-level store rather than in each ParameterGroup because
- * the desktop sidebar and the mobile sheet are both mounted at once — MobileNav
- * renders ControlsSheet whatever the viewport — so the same group has two
+ * the desktop sidebar and the mobile panel are both mounted at once — MobileNav
+ * renders ControlsPanel whatever the viewport — so the same group has two
  * component instances. Local state would let them drift apart and race each
  * other writing to localStorage.
  */
