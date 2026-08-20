@@ -280,6 +280,30 @@
     -webkit-user-select: text;
     user-select: text;
   }
+
+  /* The browser's own focus ring, gated the same way focusKey gates ours.
+     `focusKey:` only reaches the rings this app draws, and most of the chrome
+     draws none — the segmented tracks, the filters button, the appearance
+     toggle, the group headers and the panel's own header all lean on the UA
+     ring instead. That ring is not styled, so it was not gated, and it is the
+     one that showed: opening the controls panel puts script focus on a `w-full`
+     header button, WebKit matches :focus-visible on a script focus, and iOS
+     drew its blue ring around the full width of it — reading as two bands
+     across the panel, because the left and right edges are off screen.
+
+     So the fallback ring is stated here instead of inherited, in the app's own
+     --ring rather than the platform's blue, and behind the same modality
+     condition. Anything that draws its own ring already carries `outline-none`,
+     which is a utility and outranks a base rule, so nothing ends up wearing
+     two. */
+  :focus-visible {
+    outline: none;
+  }
+
+  [data-input="keyboard"] :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
 
 * {
