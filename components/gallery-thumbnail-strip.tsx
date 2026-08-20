@@ -885,7 +885,7 @@ function GalleryThumbnailFrame({
       // added to the frame.
       className={cn(
         "group relative shrink-0 cursor-pointer border-2 outline-none",
-        "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
+        "focusKey:border-ring focusKey:ring-2 focusKey:ring-ring/50",
         "border-transparent",
         isVertical
           ? "h-14 w-20 origin-right rounded-[10px] p-1"

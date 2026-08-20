@@ -236,6 +236,50 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Two states the platform paints on a plain tap that this app never asked
+     for, and neither of them is focus — which is what they get mistaken for,
+     because a grey box and a ring read the same at arm's length.
+
+     iOS computes -webkit-tap-highlight-color as rgba(26, 26, 26, 0.3) on
+     anything clickable and floods the whole element with it for the length of
+     the press. The property is inherited, so `html` is the only place it has to
+     be said. Nothing is lost by refusing it: the press already has a receipt,
+     and it is ours — every control in here scales to 0.97 under `active:`,
+     sized to the control and on the app's own curve, where the platform's box
+     is a rectangle drawn around whatever it hit.
+
+     `user-select` computes to `text` on a <button> in Safari, so a finger that
+     dwells a moment on "Video" selects the word and leaves it highlighted — a
+     blue box that outlives the tap and only clears on the next one somewhere
+     else. A control's label is chrome, not content; nothing in a segmented
+     track is worth copying out of it. Text that *is* content keeps its
+     selection: the credits, and the numeric field on a slider, which is a real
+     <input> and has to stay editable.
+
+     Focus itself is untouched, deliberately. Every ring in this app is already
+     behind :focus-visible, which is keyboard-only, and that is the state it
+     should be. */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  summary,
+  label,
+  [role="button"],
+  [role="radio"],
+  [role="tab"] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 * {
@@ -462,6 +506,15 @@ input[type="range"]::-moz-range-thumb {
     }
   }
 }
+
+/* The ring's second condition, and the pair with hoverFine above: one keeps a
+   hover off a finger, this keeps a focus ring off one.
+   `:focus-visible` cannot tell a script-moved focus from a keyboard one, and
+   WebKit paints the ring for both — so every ring in this app is written
+   `focusKey:` rather than `focus-visible:`, and reads the modality that
+   lib/input-modality.ts puts on <html>. `:where()` so the ancestor costs no
+   specificity and the utilities keep sorting normally. */
+@custom-variant focusKey (&:where([data-input="keyboard"] *):focus-visible);
 
 @media (prefers-reduced-motion: reduce) {
   [data-slot="dialog-content"],

@@ -9,6 +9,7 @@ import "@blossom-carousel/react/style.css"
 import { AudioInitializer } from "@/components/audio-initializer"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SIDEBAR_WIDTH_BOOT_SCRIPT } from "@/lib/sidebar-width"
+import { INPUT_MODALITY_BOOT_SCRIPT } from "@/lib/input-modality"
 
 const spaceMono = Space_Mono({
   weight: ["400", "700"],
@@ -45,6 +46,10 @@ export default function RootLayout({
             parsed, which is what lets the stored sidebar width be in place for
             the very first paint instead of one paint late. */}
         <script dangerouslySetInnerHTML={{ __html: SIDEBAR_WIDTH_BOOT_SCRIPT }} />
+        {/* Beside it for the same reason: the first tap on a phone lands well
+            before hydration, and it is the one that decides whether the gallery
+            opens with a ring around its close button. */}
+        <script dangerouslySetInnerHTML={{ __html: INPUT_MODALITY_BOOT_SCRIPT }} />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AudioInitializer />
           {children}

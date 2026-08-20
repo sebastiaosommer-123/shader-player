@@ -166,7 +166,7 @@ export function ShutterButton({
         "group relative flex items-center justify-center rounded-full bg-transparent shadow-none outline-none",
         "text-shutter-ink hoverFine:text-shutter-ink/90",
         "cursor-pointer transition-colors duration-150 ease-out motion-reduce:transition-none",
-        "focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        "focusKey:ring-ring/50 focusKey:ring-[3px]",
         className,
       )}
       style={{ width: geometry.size, height: geometry.size, ...style }}

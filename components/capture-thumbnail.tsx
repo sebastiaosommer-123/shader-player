@@ -220,7 +220,7 @@ export function CaptureThumbnail({
           data-capture-thumbnail
           disabled={disabled}
           onClick={handleClick}
-          className="group relative block cursor-pointer appearance-none overflow-hidden border-0 bg-transparent p-0 text-inherit outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="group relative block cursor-pointer appearance-none overflow-hidden border-0 bg-transparent p-0 text-inherit outline-none focusKey:ring-[3px] focusKey:ring-ring/50"
           style={{
             width,
             height,

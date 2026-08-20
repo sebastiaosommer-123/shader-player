@@ -22,7 +22,7 @@ import { useCaptureReplacement } from "@/hooks/use-capture-replacement"
 import { GalleryThumbnailStrip } from "@/components/gallery-thumbnail-strip"
 
 const galleryButtonClass =
-  "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focus-visible:!bg-foreground/[0.06] focus-visible:!text-foreground focus-visible:border-ring focus-visible:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform] duration-150 active:scale-[0.97]"
+  "pointer-events-auto cursor-pointer rounded-full bg-background/50 backdrop-blur-md border border-border text-foreground hoverFine:!bg-foreground/[0.06] hoverFine:!text-foreground focusKey:!bg-foreground/[0.06] focusKey:!text-foreground focusKey:border-ring focusKey:ring-ring/50 [&_svg]:text-foreground transition-[background-color,transform] duration-150 active:scale-[0.97]"
 
 const WHEEL_NAVIGATION_THRESHOLD = 18
 const WHEEL_STEP_INTERVAL_MS = 100

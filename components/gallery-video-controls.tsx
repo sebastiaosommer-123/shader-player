@@ -182,7 +182,7 @@ export function GalleryVideoControls({
               both read it, so one write per frame moves the whole scrubber. */}
           <div
             ref={setTrackNode}
-            className="relative h-[2px] w-full rounded-full bg-white/20 transition-[height] duration-150 group-hover:h-[3px] group-focus-visible:h-[3px] motion-reduce:transition-none"
+            className="relative h-[2px] w-full rounded-full bg-white/20 transition-[height] duration-150 group-hover:h-[3px] group-focusKey:h-[3px] motion-reduce:transition-none"
           >
             {/* Scaled rather than widened. The radius on a 2px bar is 1px, so
                 the ellipse a non-uniform scale makes of it is a pixel wide and
@@ -199,7 +199,7 @@ export function GalleryVideoControls({
               className="pointer-events-none absolute inset-0"
               style={{ transform: "translateX(calc(var(--played, 0) * 100%))" }}
             >
-              <div className="absolute left-0 top-1/2 size-[10px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
+              <div className="absolute left-0 top-1/2 size-[10px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 group-focusKey:opacity-100 motion-reduce:transition-none" />
             </div>
           </div>
         </div>
@@ -209,7 +209,7 @@ export function GalleryVideoControls({
             type="button"
             onClick={handleToggle}
             aria-label={playing ? "Pause recording" : "Play recording"}
-            className="flex cursor-pointer items-center justify-center text-white/80 outline-none transition-colors duration-100 hover:text-white focus-visible:text-white motion-reduce:transition-none"
+            className="flex cursor-pointer items-center justify-center text-white/80 outline-none transition-colors duration-100 hover:text-white focusKey:text-white motion-reduce:transition-none"
           >
             {playing ? (
               <Pause size={16} strokeWidth={1.75} className="fill-current" />
